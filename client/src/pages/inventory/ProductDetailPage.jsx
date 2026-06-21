@@ -129,8 +129,8 @@ export default function ProductDetailPage() {
           <Detail label="SKU">{product.sku}</Detail>
           <Detail label="Category">{product.category?.name}</Detail>
           <Detail label="Unit Type">{product.unitType}</Detail>
-          <Detail label="Cost Price">{product.costPrice ? `$${product.costPrice.toFixed(2)}` : '—'}</Detail>
-          <Detail label="Selling Price">{product.sellingPrice ? `$${product.sellingPrice.toFixed(2)}` : '—'}</Detail>
+          <Detail label="Cost Price">{product.costPrice ? `Rs. ${product.costPrice.toFixed(2)}` : '—'}</Detail>
+          <Detail label="Selling Price">{product.sellingPrice ? `Rs. ${product.sellingPrice.toFixed(2)}` : '—'}</Detail>
           <Detail label="Created">{new Date(product.createdAt).toLocaleDateString()}</Detail>
           {product.description && (
             <Detail label="Description" className="col-span-full">{product.description}</Detail>

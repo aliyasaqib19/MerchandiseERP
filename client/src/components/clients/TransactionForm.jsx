@@ -54,7 +54,7 @@ export default function TransactionForm({ onSubmit: onSubmitProp, isLoading }) {
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label>Amount ($)</Label>
+          <Label>Amount (PKR)</Label>
           <Input type="number" min="0.01" step="0.01" placeholder="0.00" {...register('amount')} />
           {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
         </div>

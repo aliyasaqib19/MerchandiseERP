@@ -8,8 +8,8 @@ import { QuickActions } from './QuickActions';
 
 const STATS = [
   { label: 'Open Quotations',     value: '12',      sub: '4 awaiting client approval',  icon: FileText,    color: 'blue',   trend: 'up',   trendValue: '+3' },
-  { label: 'Pending Invoices',    value: '8',       sub: '$46,200 total value',          icon: Receipt,     color: 'orange', trend: 'down', trendValue: '-1' },
-  { label: 'Outstanding Balance', value: '$34,200', sub: 'From 5 clients',               icon: DollarSign,  color: 'red',    trend: 'down', trendValue: '-$4k' },
+  { label: 'Pending Invoices',    value: '8',       sub: 'Rs. 46,200 total value',       icon: Receipt,     color: 'orange', trend: 'down', trendValue: '-1' },
+  { label: 'Outstanding Balance', value: 'Rs. 34,200', sub: 'From 5 clients',            icon: DollarSign,  color: 'red',    trend: 'down', trendValue: '-Rs. 4k' },
   { label: 'Closed Deals / Mo.',  value: '23',      sub: 'vs 18 last month',             icon: CheckCircle, color: 'green',  trend: 'up',   trendValue: '+28%' },
 ];
 

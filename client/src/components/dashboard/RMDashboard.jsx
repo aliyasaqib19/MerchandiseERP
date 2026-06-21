@@ -7,10 +7,10 @@ import { ActivityFeed } from './ActivityFeed';
 import { QuickActions } from './QuickActions';
 
 const STATS = [
-  { label: 'Inventory Value',    value: '$128,400', sub: 'Across all warehouses',       icon: Package,       color: 'teal',   trend: 'up',   trendValue: '+4.2%' },
-  { label: 'Active Projects',    value: '18',       sub: '3 due this week',              icon: FolderKanban,  color: 'blue',   trend: 'down', trendValue: '-2' },
-  { label: 'Pending Payments',   value: '$34,200',  sub: '7 outstanding invoices',       icon: DollarSign,    color: 'orange', trend: 'up',   trendValue: '+$8k' },
-  { label: 'Monthly Revenue',    value: '$87,500',  sub: 'vs $72,100 last month',        icon: TrendingUp,    color: 'green',  trend: 'up',   trendValue: '+21%' },
+  { label: 'Inventory Value',    value: 'Rs. 1,28,400', sub: 'Across all warehouses',   icon: Package,       color: 'teal',   trend: 'up',   trendValue: '+4.2%' },
+  { label: 'Active Projects',    value: '18',           sub: '3 due this week',          icon: FolderKanban,  color: 'blue',   trend: 'down', trendValue: '-2' },
+  { label: 'Pending Payments',   value: 'Rs. 34,200',   sub: '7 outstanding invoices',   icon: DollarSign,    color: 'orange', trend: 'up',   trendValue: '+Rs. 8k' },
+  { label: 'Monthly Revenue',    value: 'Rs. 87,500',   sub: 'vs Rs. 72,100 last month', icon: TrendingUp,    color: 'green',  trend: 'up',   trendValue: '+21%' },
 ];
 
 const ACTIVITY = [

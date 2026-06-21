@@ -94,7 +94,7 @@ export default function PaymentForm({ onSuccess, defaultClientId }) {
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label>Amount ($) *</Label>
+          <Label>Amount (PKR) *</Label>
           <Input
             type="number" min="0.01" step="0.01" placeholder="0.00"
             {...register('amount')}
