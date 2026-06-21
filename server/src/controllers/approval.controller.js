@@ -1,4 +1,5 @@
 const prisma = require('../utils/prisma');
+const { logAudit } = require('./audit.controller');
 
 async function listApprovals(req, res, next) {
   try {
@@ -83,6 +84,7 @@ async function createApproval(req, res, next) {
       });
     }
 
+    logAudit({ userId: req.user.id, action: 'CREATE', module: 'APPROVALS', resourceId: item.id, resourceType: 'ApprovalRequest', newValues: { type, title, priority }, req });
     res.status(201).json(item);
   } catch (err) { next(err); }
 }
@@ -122,6 +124,7 @@ async function decide(req, res, next) {
       },
     });
 
+    logAudit({ userId: req.user.id, action: decision, module: 'APPROVALS', resourceId: item.id, resourceType: 'ApprovalRequest', newValues: { decision, decisionNote }, req });
     res.json(item);
   } catch (err) { next(err); }
 }
@@ -137,6 +140,7 @@ async function cancelApproval(req, res, next) {
       where: { id: Number(req.params.id) },
       data: { status: 'CANCELLED' },
     });
+    logAudit({ userId: req.user.id, action: 'CANCEL', module: 'APPROVALS', resourceId: updated.id, resourceType: 'ApprovalRequest', req });
     res.json(updated);
   } catch (err) { next(err); }
 }

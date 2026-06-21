@@ -1,5 +1,6 @@
 const prisma = require('../utils/prisma');
 const { generateDocNumber } = require('../utils/numberGen');
+const { logAudit } = require('./audit.controller');
 
 const USER_SELECT = { id: true, fullName: true, email: true };
 
@@ -113,6 +114,7 @@ async function createProject(req, res) {
     include: PROJECT_INCLUDE,
   });
 
+  logAudit({ userId: req.user.id, action: 'CREATE', module: 'PROJECTS', resourceId: project.id, resourceType: 'Project', newValues: { projectNumber: project.projectNumber, title, clientId }, req });
   res.status(201).json(project);
 }
 
@@ -137,6 +139,7 @@ async function updateProject(req, res) {
   if (status           !== undefined) data.status           = status;
 
   const project = await prisma.project.update({ where: { id }, data, include: PROJECT_INCLUDE });
+  logAudit({ userId: req.user.id, action: 'UPDATE', module: 'PROJECTS', resourceId: id, resourceType: 'Project', newValues: data, req });
   res.json(project);
 }
 
@@ -153,6 +156,7 @@ async function updateStatus(req, res) {
   if (status === 'COMPLETED' || status === 'CLOSED') data.completedAt = new Date();
 
   const project = await prisma.project.update({ where: { id }, data, include: PROJECT_INCLUDE });
+  logAudit({ userId: req.user.id, action: 'STATUS_CHANGE', module: 'PROJECTS', resourceId: id, resourceType: 'Project', newValues: { status }, req });
   res.json(project);
 }
 
@@ -177,6 +181,7 @@ async function assignTeam(req, res) {
     )
   );
 
+  logAudit({ userId: req.user.id, action: 'ASSIGN_TEAM', module: 'PROJECTS', resourceId: projectId, resourceType: 'Project', newValues: { assignments }, req });
   res.json(results);
 }
 
@@ -187,7 +192,7 @@ async function removeAssignment(req, res) {
   await prisma.projectAssignment.delete({
     where: { projectId_userId: { projectId, userId } },
   });
-
+  logAudit({ userId: req.user.id, action: 'REMOVE_ASSIGNMENT', module: 'PROJECTS', resourceId: projectId, resourceType: 'Project', newValues: { removedUserId: userId }, req });
   res.json({ message: 'Removed' });
 }
 

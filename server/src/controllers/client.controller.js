@@ -1,4 +1,5 @@
 const prisma = require('../utils/prisma');
+const { logAudit } = require('./audit.controller');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -180,6 +181,7 @@ async function createClient(req, res) {
     return tx.client.findUnique({ where: { id: c.id }, select: CLIENT_SELECT });
   });
 
+  logAudit({ userId: req.user.id, action: 'CREATE', module: 'CLIENTS', resourceId: client.id, resourceType: 'Client', newValues: { companyName, industry, status }, req });
   res.status(201).json(client);
 }
 
@@ -199,6 +201,7 @@ async function updateClient(req, res) {
     },
     select: CLIENT_SELECT,
   });
+  logAudit({ userId: req.user.id, action: 'UPDATE', module: 'CLIENTS', resourceId: client.id, resourceType: 'Client', newValues: { companyName, status }, req });
   res.json(client);
 }
 
@@ -207,9 +210,11 @@ async function deleteClient(req, res) {
   const txCount = await prisma.clientTransaction.count({ where: { clientId: id } });
   if (txCount > 0) {
     await prisma.client.update({ where: { id }, data: { status: 'INACTIVE' } });
+    logAudit({ userId: req.user.id, action: 'DEACTIVATE', module: 'CLIENTS', resourceId: id, resourceType: 'Client', req });
     return res.json({ message: 'Client deactivated (has transaction history)' });
   }
   await prisma.client.delete({ where: { id } });
+  logAudit({ userId: req.user.id, action: 'DELETE', module: 'CLIENTS', resourceId: id, resourceType: 'Client', req });
   res.json({ message: 'Client deleted' });
 }
 
@@ -236,6 +241,7 @@ async function createContact(req, res) {
     });
   });
 
+  logAudit({ userId: req.user.id, action: 'CREATE', module: 'CLIENTS', resourceId: contact.id, resourceType: 'Contact', newValues: { fullName, clientId }, req });
   res.status(201).json(contact);
 }
 
@@ -254,11 +260,13 @@ async function updateContact(req, res) {
     });
   });
 
+  logAudit({ userId: req.user.id, action: 'UPDATE', module: 'CLIENTS', resourceId: contact.id, resourceType: 'Contact', newValues: { fullName }, req });
   res.json(contact);
 }
 
 async function deleteContact(req, res) {
   await prisma.contact.delete({ where: { id: Number(req.params.contactId) } });
+  logAudit({ userId: req.user.id, action: 'DELETE', module: 'CLIENTS', resourceId: Number(req.params.contactId), resourceType: 'Contact', req });
   res.json({ message: 'Contact deleted' });
 }
 
@@ -283,6 +291,7 @@ async function createNote(req, res) {
     },
     include: { user: { select: { id: true, fullName: true } } },
   });
+  logAudit({ userId: req.user.id, action: 'CREATE', module: 'CLIENTS', resourceId: note.id, resourceType: 'ClientNote', newValues: { clientId: Number(req.params.id) }, req });
   res.status(201).json(note);
 }
 
@@ -293,6 +302,7 @@ async function deleteNote(req, res) {
     return res.status(403).json({ message: 'Cannot delete another user\'s note' });
   }
   await prisma.clientNote.delete({ where: { id: note.id } });
+  logAudit({ userId: req.user.id, action: 'DELETE', module: 'CLIENTS', resourceId: note.id, resourceType: 'ClientNote', req });
   res.json({ message: 'Note deleted' });
 }
 
@@ -354,11 +364,13 @@ async function createTransaction(req, res) {
     include: { user: { select: { id: true, fullName: true } } },
   });
 
+  logAudit({ userId: req.user.id, action: 'CREATE', module: 'CLIENTS', resourceId: tx.id, resourceType: 'ClientTransaction', newValues: { type, amount, clientId: Number(req.params.id) }, req });
   res.status(201).json(tx);
 }
 
 async function deleteTransaction(req, res) {
   await prisma.clientTransaction.delete({ where: { id: Number(req.params.txId) } });
+  logAudit({ userId: req.user.id, action: 'DELETE', module: 'CLIENTS', resourceId: Number(req.params.txId), resourceType: 'ClientTransaction', req });
   res.json({ message: 'Transaction deleted' });
 }
 

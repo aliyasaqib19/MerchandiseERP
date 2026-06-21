@@ -1,5 +1,6 @@
 const prisma = require('../utils/prisma');
 const { generateDocNumber } = require('../utils/numberGen');
+const { logAudit } = require('./audit.controller');
 
 const QUOTATION_INCLUDE = {
   client:        { select: { id: true, companyName: true, email: true, taxNumber: true, address: true, city: true, country: true } },
@@ -113,6 +114,7 @@ async function createQuotation(req, res) {
     include: QUOTATION_INCLUDE,
   });
 
+  logAudit({ userId: req.user.id, action: 'CREATE', module: 'SALES', resourceId: quotation.id, resourceType: 'Quotation', newValues: { quotationNumber: quotation.quotationNumber, clientId, totalAmount }, req });
   res.status(201).json(quotation);
 }
 
@@ -156,6 +158,7 @@ async function updateQuotation(req, res) {
     });
   });
 
+  logAudit({ userId: req.user.id, action: 'UPDATE', module: 'SALES', resourceId: id, resourceType: 'Quotation', newValues: { totalAmount }, req });
   res.json(quotation);
 }
 
@@ -165,6 +168,7 @@ async function deleteQuotation(req, res) {
   if (!q) return res.status(404).json({ message: 'Not found' });
   if (q.status !== 'DRAFT') return res.status(400).json({ message: 'Only DRAFT quotations can be deleted' });
   await prisma.quotation.delete({ where: { id } });
+  logAudit({ userId: req.user.id, action: 'DELETE', module: 'SALES', resourceId: id, resourceType: 'Quotation', req });
   res.json({ message: 'Quotation deleted' });
 }
 
@@ -192,6 +196,7 @@ async function updateStatus(req, res) {
     data: { status },
     include: QUOTATION_INCLUDE,
   });
+  logAudit({ userId: req.user.id, action: 'STATUS_CHANGE', module: 'SALES', resourceId: id, resourceType: 'Quotation', oldValues: { status: q.status }, newValues: { status }, req });
   res.json(updated);
 }
 
@@ -233,6 +238,7 @@ async function convertToSale(req, res) {
     },
   });
 
+  logAudit({ userId: req.user.id, action: 'CONVERT_TO_SALE', module: 'SALES', resourceId: q.id, resourceType: 'Quotation', newValues: { saleNumber: sale.saleNumber }, req });
   res.status(201).json(sale);
 }
 

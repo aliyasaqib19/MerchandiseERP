@@ -1,4 +1,5 @@
 const prisma = require('../utils/prisma');
+const { logAudit } = require('./audit.controller');
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
@@ -71,6 +72,7 @@ async function createCategory(req, res) {
   const exists = await prisma.category.findUnique({ where: { name } });
   if (exists) return res.status(409).json({ message: 'Category already exists' });
   const category = await prisma.category.create({ data: { name, description } });
+  logAudit({ userId: req.user.id, action: 'CREATE', module: 'INVENTORY', resourceId: category.id, resourceType: 'Category', newValues: { name }, req });
   res.status(201).json(category);
 }
 
@@ -80,6 +82,7 @@ async function updateCategory(req, res) {
     where: { id: Number(req.params.id) },
     data: { name, description },
   });
+  logAudit({ userId: req.user.id, action: 'UPDATE', module: 'INVENTORY', resourceId: category.id, resourceType: 'Category', newValues: { name }, req });
   res.json(category);
 }
 
@@ -90,6 +93,7 @@ async function deleteCategory(req, res) {
     return res.status(400).json({ message: 'Cannot delete category with products assigned to it' });
   }
   await prisma.category.delete({ where: { id } });
+  logAudit({ userId: req.user.id, action: 'DELETE', module: 'INVENTORY', resourceId: id, resourceType: 'Category', req });
   res.json({ message: 'Category deleted' });
 }
 
@@ -181,6 +185,7 @@ async function createProduct(req, res) {
     return p;
   });
 
+  logAudit({ userId: req.user.id, action: 'CREATE', module: 'INVENTORY', resourceId: product.id, resourceType: 'Product', newValues: { sku, name, quantity: initialQty }, req });
   res.status(201).json(product);
 }
 
@@ -202,6 +207,7 @@ async function updateProduct(req, res) {
     include: { category: { select: { id: true, name: true } } },
   });
 
+  logAudit({ userId: req.user.id, action: 'UPDATE', module: 'INVENTORY', resourceId: product.id, resourceType: 'Product', newValues: { name, status }, req });
   res.json(product);
 }
 
@@ -210,12 +216,13 @@ async function deleteProduct(req, res) {
   const txCount = await prisma.inventoryTransaction.count({ where: { productId: id } });
 
   if (txCount > 0) {
-    // Soft delete — mark as discontinued
     await prisma.product.update({ where: { id }, data: { status: 'DISCONTINUED' } });
+    logAudit({ userId: req.user.id, action: 'DISCONTINUE', module: 'INVENTORY', resourceId: id, resourceType: 'Product', req });
     return res.json({ message: 'Product discontinued (has transaction history)' });
   }
 
   await prisma.product.delete({ where: { id } });
+  logAudit({ userId: req.user.id, action: 'DELETE', module: 'INVENTORY', resourceId: id, resourceType: 'Product', req });
   res.json({ message: 'Product deleted' });
 }
 
@@ -255,6 +262,7 @@ async function stockIn(req, res) {
     });
   });
 
+  logAudit({ userId: req.user.id, action: 'STOCK_IN', module: 'INVENTORY', resourceId: result.productId, resourceType: 'Product', newValues: { quantity: qty, reference, balanceAfter: result.balanceAfter }, req });
   res.status(201).json(result);
 }
 
@@ -298,6 +306,7 @@ async function stockOut(req, res) {
     });
   });
 
+  logAudit({ userId: req.user.id, action: 'STOCK_OUT', module: 'INVENTORY', resourceId: result.productId, resourceType: 'Product', newValues: { quantity: qty, reference, balanceAfter: result.balanceAfter }, req });
   res.status(201).json(result);
 }
 
@@ -331,6 +340,7 @@ async function adjustStock(req, res) {
     });
   });
 
+  logAudit({ userId: req.user.id, action: 'STOCK_ADJUST', module: 'INVENTORY', resourceId: result.productId, resourceType: 'Product', newValues: { newQuantity: targetQty, balanceAfter: result.balanceAfter }, req });
   res.status(201).json(result);
 }
 

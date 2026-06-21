@@ -1,5 +1,6 @@
 const prisma = require('../utils/prisma');
 const { generateDocNumber } = require('../utils/numberGen');
+const { logAudit } = require('./audit.controller');
 
 const SALE_INCLUDE = {
   client:        { select: { id: true, companyName: true, email: true, taxNumber: true, address: true, city: true, country: true } },
@@ -160,6 +161,7 @@ async function createSale(req, res) {
     include: SALE_INCLUDE,
   });
 
+  logAudit({ userId: req.user.id, action: 'CREATE', module: 'SALES', resourceId: sale.id, resourceType: 'Sale', newValues: { saleNumber: sale.saleNumber, clientId, totalAmount: sale.totalAmount }, req });
   res.status(201).json(sale);
 }
 
@@ -199,6 +201,7 @@ async function updateSale(req, res) {
     });
   });
 
+  logAudit({ userId: req.user.id, action: 'UPDATE', module: 'SALES', resourceId: id, resourceType: 'Sale', newValues: { totalAmount: sale.totalAmount }, req });
   res.json(sale);
 }
 
@@ -208,6 +211,7 @@ async function deleteSale(req, res) {
   if (!sale) return res.status(404).json({ message: 'Not found' });
   if (sale.status !== 'DRAFT') return res.status(400).json({ message: 'Only DRAFT sales can be deleted' });
   await prisma.sale.delete({ where: { id } });
+  logAudit({ userId: req.user.id, action: 'DELETE', module: 'SALES', resourceId: id, resourceType: 'Sale', req });
   res.json({ message: 'Sale deleted' });
 }
 
@@ -283,6 +287,7 @@ async function confirmSale(req, res) {
     return confirmed;
   });
 
+  logAudit({ userId: req.user.id, action: 'CONFIRM', module: 'SALES', resourceId: result.id, resourceType: 'Sale', newValues: { saleNumber: result.saleNumber, totalAmount: result.totalAmount }, req });
   res.json(result);
 }
 
@@ -297,6 +302,7 @@ async function deliverSale(req, res) {
     data: { status: 'DELIVERED' },
     include: SALE_INCLUDE,
   });
+  logAudit({ userId: req.user.id, action: 'DELIVER', module: 'SALES', resourceId: id, resourceType: 'Sale', req });
   res.json(updated);
 }
 
@@ -356,6 +362,7 @@ async function cancelSale(req, res) {
     });
   });
 
+  logAudit({ userId: req.user.id, action: 'CANCEL', module: 'SALES', resourceId: result.id, resourceType: 'Sale', req });
   res.json(result);
 }
 

@@ -1,5 +1,6 @@
 const prisma = require('../utils/prisma');
 const { generateDocNumber } = require('../utils/numberGen');
+const { logAudit } = require('./audit.controller');
 
 const PO_INCLUDE = {
   client:        { select: { id: true, companyName: true, email: true, address: true, city: true, country: true } },
@@ -91,6 +92,7 @@ async function createPurchaseOrder(req, res) {
     include: PO_INCLUDE,
   });
 
+  logAudit({ userId: req.user.id, action: 'CREATE', module: 'SALES', resourceId: po.id, resourceType: 'PurchaseOrder', newValues: { poNumber: po.poNumber, clientId, totalAmount }, req });
   res.status(201).json(po);
 }
 
@@ -131,6 +133,7 @@ async function updatePurchaseOrder(req, res) {
     });
   });
 
+  logAudit({ userId: req.user.id, action: 'UPDATE', module: 'SALES', resourceId: id, resourceType: 'PurchaseOrder', newValues: { totalAmount }, req });
   res.json(po);
 }
 
@@ -156,6 +159,7 @@ async function updateStatus(req, res) {
     data: { status },
     include: PO_INCLUDE,
   });
+  logAudit({ userId: req.user.id, action: 'STATUS_CHANGE', module: 'SALES', resourceId: id, resourceType: 'PurchaseOrder', oldValues: { status: po.status }, newValues: { status }, req });
   res.json(updated);
 }
 
@@ -196,6 +200,7 @@ async function convertToSale(req, res) {
     },
   });
 
+  logAudit({ userId: req.user.id, action: 'CONVERT_TO_SALE', module: 'SALES', resourceId: po.id, resourceType: 'PurchaseOrder', newValues: { saleNumber: sale.saleNumber }, req });
   res.status(201).json(sale);
 }
 

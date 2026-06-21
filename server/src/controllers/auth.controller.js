@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const prisma = require('../utils/prisma');
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
+const { logAudit } = require('./audit.controller');
 
 async function login(req, res) {
   const { email, password } = req.body;
@@ -42,6 +43,8 @@ async function login(req, res) {
   await prisma.refreshToken.create({
     data: { token: refreshToken, userId: user.id, expiresAt },
   });
+
+  logAudit({ userId: user.id, action: 'LOGIN', module: 'AUTH', resourceId: user.id, resourceType: 'User', req });
 
   res.json({
     accessToken,
@@ -93,6 +96,7 @@ async function logout(req, res) {
   if (refreshToken) {
     await prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
   }
+  if (req.user) logAudit({ userId: req.user.id, action: 'LOGOUT', module: 'AUTH', resourceType: 'User', req });
   res.json({ message: 'Logged out successfully' });
 }
 
@@ -149,6 +153,7 @@ async function updateProfile(req, res) {
     where: { id: req.user.id },
     data: { fullName: fullName.trim(), phone: phone || null },
   });
+  logAudit({ userId: req.user.id, action: 'UPDATE_PROFILE', module: 'USERS', resourceId: user.id, resourceType: 'User', newValues: { fullName, phone }, req });
   res.json({ id: user.id, fullName: user.fullName, phone: user.phone, email: user.email });
 }
 
@@ -171,6 +176,7 @@ async function changePassword(req, res) {
   }
   const hash = await bcrypt.hash(newPassword, 12);
   await prisma.user.update({ where: { id: req.user.id }, data: { passwordHash: hash } });
+  logAudit({ userId: req.user.id, action: 'CHANGE_PASSWORD', module: 'USERS', resourceId: req.user.id, resourceType: 'User', req });
   res.json({ message: 'Password changed successfully' });
 }
 

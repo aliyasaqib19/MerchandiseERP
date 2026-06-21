@@ -1,4 +1,5 @@
 const prisma = require('../utils/prisma');
+const { logAudit } = require('./audit.controller');
 
 const today = () => new Date();
 
@@ -187,6 +188,7 @@ async function recordPayment(req, res) {
     },
   });
 
+  logAudit({ userId: req.user.id, action: 'RECORD_PAYMENT', module: 'FINANCE', resourceId: payment.id, resourceType: 'Payment', newValues: { clientId: Number(clientId), amount: Number(amount), paymentMethod }, req });
   res.status(201).json(payment);
 }
 

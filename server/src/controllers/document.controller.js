@@ -1,4 +1,5 @@
 const prisma = require('../utils/prisma');
+const { logAudit } = require('./audit.controller');
 
 async function listDocuments(req, res, next) {
   try {
@@ -58,6 +59,7 @@ async function createDocument(req, res, next) {
       },
       include: { uploader: { select: { id: true, fullName: true } } },
     });
+    logAudit({ userId: req.user.id, action: 'CREATE', module: 'DOCUMENTS', resourceId: doc.id, resourceType: 'Document', newValues: { title, category, fileName }, req });
     res.status(201).json(doc);
   } catch (err) { next(err); }
 }
@@ -70,6 +72,7 @@ async function updateDocument(req, res, next) {
       data: { title, description, category, tags, status },
       include: { uploader: { select: { id: true, fullName: true } } },
     });
+    logAudit({ userId: req.user.id, action: 'UPDATE', module: 'DOCUMENTS', resourceId: doc.id, resourceType: 'Document', newValues: { title, category, status }, req });
     res.json(doc);
   } catch (err) { next(err); }
 }
@@ -97,6 +100,7 @@ async function uploadVersion(req, res, next) {
         data: { fileUrl, fileName, version: existing.version + 1 },
       }),
     ]);
+    logAudit({ userId: req.user.id, action: 'UPLOAD_VERSION', module: 'DOCUMENTS', resourceId: docId, resourceType: 'Document', newValues: { version: existing.version + 1, fileName }, req });
     res.status(201).json(version);
   } catch (err) { next(err); }
 }
@@ -107,6 +111,7 @@ async function deleteDocument(req, res, next) {
       where: { id: Number(req.params.id) },
       data: { status: 'DELETED' },
     });
+    logAudit({ userId: req.user.id, action: 'DELETE', module: 'DOCUMENTS', resourceId: Number(req.params.id), resourceType: 'Document', req });
     res.json({ message: 'Deleted' });
   } catch (err) { next(err); }
 }

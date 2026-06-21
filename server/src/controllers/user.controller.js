@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const prisma = require('../utils/prisma');
+const { logAudit } = require('./audit.controller');
 
 async function getUsers(req, res) {
   const users = await prisma.user.findMany({
@@ -65,6 +66,7 @@ async function createUser(req, res) {
     },
   });
 
+  logAudit({ userId: req.user.id, action: 'CREATE', module: 'USERS', resourceId: user.id, resourceType: 'User', newValues: { fullName, email, roleId, status }, req });
   res.status(201).json(user);
 }
 
@@ -91,6 +93,7 @@ async function updateUser(req, res) {
     },
   });
 
+  logAudit({ userId: req.user.id, action: 'UPDATE', module: 'USERS', resourceId: user.id, resourceType: 'User', newValues: { fullName, phone, roleId, status }, req });
   res.json(user);
 }
 
@@ -100,6 +103,7 @@ async function deleteUser(req, res) {
     return res.status(400).json({ message: 'Cannot delete your own account' });
   }
   await prisma.user.delete({ where: { id } });
+  logAudit({ userId: req.user.id, action: 'DELETE', module: 'USERS', resourceId: id, resourceType: 'User', req });
   res.json({ message: 'User deleted' });
 }
 
@@ -110,6 +114,7 @@ async function resetUserPassword(req, res) {
     where: { id: Number(req.params.id) },
     data: { passwordHash },
   });
+  logAudit({ userId: req.user.id, action: 'RESET_PASSWORD', module: 'USERS', resourceId: Number(req.params.id), resourceType: 'User', req });
   res.json({ message: 'Password reset successfully' });
 }
 

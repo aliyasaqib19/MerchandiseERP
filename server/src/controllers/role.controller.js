@@ -1,4 +1,5 @@
 const prisma = require('../utils/prisma');
+const { logAudit } = require('./audit.controller');
 
 async function getRoles(req, res) {
   const roles = await prisma.role.findMany({
@@ -41,6 +42,7 @@ async function createRole(req, res) {
     },
   });
 
+  logAudit({ userId: req.user.id, action: 'CREATE', module: 'ROLES', resourceId: role.id, resourceType: 'Role', newValues: { name }, req });
   res.status(201).json(role);
 }
 
@@ -66,6 +68,7 @@ async function updateRole(req, res) {
     }),
   ]);
 
+  logAudit({ userId: req.user.id, action: 'UPDATE', module: 'ROLES', resourceId: roleId, resourceType: 'Role', newValues: { name, permissionIds }, req });
   res.json(updated[1]);
 }
 
@@ -81,6 +84,7 @@ async function deleteRole(req, res) {
   }
 
   await prisma.role.delete({ where: { id: roleId } });
+  logAudit({ userId: req.user.id, action: 'DELETE', module: 'ROLES', resourceId: roleId, resourceType: 'Role', oldValues: { name: role.name }, req });
   res.json({ message: 'Role deleted' });
 }
 
