@@ -1,3 +1,0 @@
-REJECTION: TypeError: Cannot read properties of undefined (reading 'message')
-    at boot (G:\inventoria\dist-installer\win-unpacked\resources\app\electron\main.js:288:28)
-    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
