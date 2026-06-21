@@ -67,7 +67,7 @@ if (process.env.NODE_ENV === 'production') {
   const clientDist = path.join(__dirname, '..', 'public');
   if (fs.existsSync(clientDist)) {
     app.use(express.static(clientDist));
-    app.get('*', (_req, res) => {
+    app.get(/.*/, (_req, res) => {
       res.sendFile(path.join(clientDist, 'index.html'));
     });
   }
