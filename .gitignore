@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Environment files
+.env
+server/.env
+
+# Build output
+client/dist/
+server/public/
+dist-installer/
+
+# Logs
+*.log
+logs/
+
+# Prisma
+server/prisma/dev.db
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Electron dev
+out/

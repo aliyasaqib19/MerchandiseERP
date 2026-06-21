@@ -1,0 +1,826 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Auth & RBAC ─────────────────────────────────────────────────────────────
+
+model User {
+  id            Int        @id @default(autoincrement())
+  fullName      String
+  email         String     @unique
+  phone         String?
+  passwordHash  String
+  branchId      Int?
+  roleId        Int
+  status        UserStatus @default(ACTIVE)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  role                  Role                   @relation(fields: [roleId], references: [id])
+  branch                Branch?                @relation(fields: [branchId], references: [id])
+  refreshTokens         RefreshToken[]
+  inventoryTransactions InventoryTransaction[]
+  clientsCreated        Client[]
+  clientNotes           ClientNote[]
+  clientTransactions    ClientTransaction[]
+  quotations            Quotation[]            @relation("QuotationCreator")
+  purchaseOrders        PurchaseOrder[]        @relation("POCreator")
+  sales                 Sale[]                 @relation("SaleCreator")
+  managedProjects       Project[]              @relation("ProjectManager")
+  createdProjects       Project[]              @relation("ProjectCreator")
+  projectAssignments    ProjectAssignment[]    @relation("AssignedUser")
+  projectAssignmentsMade ProjectAssignment[]   @relation("AssignedBy")
+  siteVisits            SiteVisit[]            @relation("SiteVisitor")
+  workLogs              WorkLog[]              @relation("WorkLogUser")
+  uploadedPhotos        SitePhoto[]            @relation("PhotoUploader")
+  generatedReports      ServiceReport[]        @relation("ReportGenerator")
+  approvalRequests      ApprovalRequest[]      @relation("ApprovalRequester")
+  approvalAssignments   ApprovalRequest[]      @relation("ApprovalAssignee")
+  approvalDecisions     ApprovalRequest[]      @relation("ApprovalDecider")
+  documents             Document[]             @relation("DocumentUploader")
+  documentVersions      DocumentVersion[]      @relation("VersionUploader")
+  notifications         Notification[]         @relation("UserNotifications")
+  auditLogs             AuditLog[]             @relation("AuditUser")
+
+  @@map("users")
+}
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users           User[]
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          Int    @id @default(autoincrement())
+  name        String @unique
+  displayName String
+  module      Module
+  action      Action
+  description String?
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model Branch {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  location  String?
+  createdAt DateTime @default(now())
+
+  users User[]
+
+  @@map("branches")
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  userId    Int
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// ─── Inventory ───────────────────────────────────────────────────────────────
+
+model Category {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id            Int           @id @default(autoincrement())
+  sku           String        @unique
+  name          String
+  description   String?
+  categoryId    Int
+  unitType      UnitType      @default(PIECE)
+  quantity      Float         @default(0)
+  minThreshold  Float         @default(0)
+  costPrice     Float?
+  sellingPrice  Float?
+  status        ProductStatus @default(ACTIVE)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  category      Category               @relation(fields: [categoryId], references: [id])
+  transactions  InventoryTransaction[]
+  quotationItems QuotationItem[]
+  poItems        POItem[]
+  saleItems      SaleItem[]
+
+  @@map("products")
+}
+
+model InventoryTransaction {
+  id           Int             @id @default(autoincrement())
+  productId    Int
+  type         TransactionType
+  quantity     Float
+  balanceAfter Float
+  reference    String?
+  notes        String?
+  createdBy    Int
+  createdAt    DateTime        @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+  user    User    @relation(fields: [createdBy], references: [id])
+
+  @@map("inventory_transactions")
+}
+
+// ─── CRM ─────────────────────────────────────────────────────────────────────
+
+model Client {
+  id          Int          @id @default(autoincrement())
+  companyName String
+  industry    String?
+  email       String?
+  phone       String?
+  mobile      String?
+  website     String?
+  address     String?
+  city        String?
+  country     String?
+  taxNumber   String?
+  creditLimit Float?
+  status      ClientStatus @default(ACTIVE)
+  notes       String?
+  createdBy   Int
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  createdByUser  User               @relation(fields: [createdBy], references: [id])
+  contacts       Contact[]
+  clientNotes    ClientNote[]
+  transactions   ClientTransaction[]
+  quotations     Quotation[]
+  purchaseOrders PurchaseOrder[]
+  sales          Sale[]
+  projects       Project[]
+
+  @@map("clients")
+}
+
+model Contact {
+  id        Int      @id @default(autoincrement())
+  clientId  Int
+  fullName  String
+  title     String?
+  email     String?
+  phone     String?
+  mobile    String?
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("contacts")
+}
+
+model ClientNote {
+  id        Int      @id @default(autoincrement())
+  clientId  Int
+  note      String
+  createdBy Int
+  createdAt DateTime @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [createdBy], references: [id])
+
+  @@map("client_notes")
+}
+
+model ClientTransaction {
+  id            Int                   @id @default(autoincrement())
+  clientId      Int
+  type          ClientTransactionType
+  amount        Float
+  description   String
+  reference     String?
+  paymentMethod String?
+  date          DateTime              @default(now())
+  dueDate       DateTime?
+  createdBy     Int
+  createdAt     DateTime              @default(now())
+
+  client Client @relation(fields: [clientId], references: [id])
+  user   User   @relation(fields: [createdBy], references: [id])
+  sale   Sale?  @relation("SaleInvoice")
+
+  @@map("client_transactions")
+}
+
+// ─── Sales ───────────────────────────────────────────────────────────────────
+
+model Quotation {
+  id              Int             @id @default(autoincrement())
+  quotationNumber String          @unique
+  clientId        Int
+  createdBy       Int
+  status          QuotationStatus @default(DRAFT)
+  validUntil      DateTime?
+  notes           String?
+  terms           String?
+  subtotal        Float           @default(0)
+  discountType    DiscountType    @default(PERCENTAGE)
+  discountValue   Float           @default(0)
+  discountAmount  Float           @default(0)
+  taxRate         Float           @default(0)
+  taxAmount       Float           @default(0)
+  totalAmount     Float           @default(0)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  client         Client          @relation(fields: [clientId], references: [id])
+  createdByUser  User            @relation("QuotationCreator", fields: [createdBy], references: [id])
+  items          QuotationItem[]
+  purchaseOrders PurchaseOrder[]
+  sales          Sale[]
+
+  @@map("quotations")
+}
+
+model QuotationItem {
+  id          Int     @id @default(autoincrement())
+  quotationId Int
+  productId   Int?
+  description String
+  quantity    Float
+  unitPrice   Float
+  discount    Float   @default(0)
+  total       Float
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  product   Product?  @relation(fields: [productId], references: [id])
+
+  @@map("quotation_items")
+}
+
+model PurchaseOrder {
+  id               Int      @id @default(autoincrement())
+  poNumber         String   @unique
+  clientId         Int
+  quotationId      Int?
+  createdBy        Int
+  status           POStatus @default(PENDING)
+  notes            String?
+  subtotal         Float    @default(0)
+  taxRate          Float    @default(0)
+  taxAmount        Float    @default(0)
+  totalAmount      Float    @default(0)
+  poDate           DateTime @default(now())
+  expectedDelivery DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  client        Client    @relation(fields: [clientId], references: [id])
+  quotation     Quotation? @relation(fields: [quotationId], references: [id])
+  createdByUser User      @relation("POCreator", fields: [createdBy], references: [id])
+  items         POItem[]
+  sales         Sale[]
+
+  @@map("purchase_orders")
+}
+
+model POItem {
+  id          Int   @id @default(autoincrement())
+  poId        Int
+  productId   Int?
+  description String
+  quantity    Float
+  unitPrice   Float
+  total       Float
+
+  purchaseOrder PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  product       Product?      @relation(fields: [productId], references: [id])
+
+  @@map("po_items")
+}
+
+model Sale {
+  id             Int        @id @default(autoincrement())
+  saleNumber     String     @unique
+  clientId       Int
+  quotationId    Int?
+  poId           Int?
+  createdBy      Int
+  status         SaleStatus @default(DRAFT)
+  notes          String?
+  subtotal       Float      @default(0)
+  discountAmount Float      @default(0)
+  taxRate        Float      @default(0)
+  taxAmount      Float      @default(0)
+  totalAmount    Float      @default(0)
+  saleDate       DateTime   @default(now())
+  invoiceId      Int?       @unique
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  client        Client             @relation(fields: [clientId], references: [id])
+  quotation     Quotation?         @relation(fields: [quotationId], references: [id])
+  purchaseOrder PurchaseOrder?     @relation(fields: [poId], references: [id])
+  createdByUser User               @relation("SaleCreator", fields: [createdBy], references: [id])
+  items         SaleItem[]
+  invoice       ClientTransaction? @relation("SaleInvoice", fields: [invoiceId], references: [id])
+  projects      Project[]
+
+  @@map("sales")
+}
+
+model SaleItem {
+  id          Int   @id @default(autoincrement())
+  saleId      Int
+  productId   Int?
+  description String
+  quantity    Float
+  unitPrice   Float
+  costPrice   Float @default(0)
+  discount    Float @default(0)
+  total       Float
+
+  sale    Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id])
+
+  @@map("sale_items")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum Module {
+  INVENTORY
+  CLIENTS
+  SALES
+  PROJECTS
+  FINANCE
+  USERS
+  ROLES
+  SETTINGS
+  APPROVALS
+  DOCUMENTS
+  NOTIFICATIONS
+  AUDIT
+  REPORTS
+}
+
+enum Action {
+  VIEW
+  CREATE
+  UPDATE
+  DELETE
+  EXPORT
+  APPROVE
+}
+
+enum UnitType {
+  PIECE
+  METER
+  KG
+  LITER
+  BOX
+  ROLL
+  SET
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  DISCONTINUED
+}
+
+enum TransactionType {
+  STOCK_IN
+  STOCK_OUT
+  ADJUSTMENT
+  SALE
+  RETURN
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  PROSPECT
+  BLACKLISTED
+}
+
+enum ClientTransactionType {
+  INVOICE
+  PAYMENT
+  CREDIT_NOTE
+  DEBIT_NOTE
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum POStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum SaleStatus {
+  DRAFT
+  CONFIRMED
+  DELIVERED
+  CANCELLED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+// ─── Projects ─────────────────────────────────────────────────────────────────
+
+model Project {
+  id               Int           @id @default(autoincrement())
+  projectNumber    String        @unique
+  title            String
+  clientId         Int
+  saleId           Int?
+  managerId        Int
+  status           ProjectStatus @default(PLANNING)
+  location         String?
+  address          String?
+  city             String?
+  startDate        DateTime?
+  estimatedEndDate DateTime?
+  completedAt      DateTime?
+  notes            String?
+  createdBy        Int
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  client          Client              @relation(fields: [clientId], references: [id])
+  sale            Sale?               @relation(fields: [saleId], references: [id])
+  manager         User                @relation("ProjectManager", fields: [managerId], references: [id])
+  createdByUser   User                @relation("ProjectCreator", fields: [createdBy], references: [id])
+  assignments     ProjectAssignment[]
+  siteVisits      SiteVisit[]
+  workLogs        WorkLog[]
+  serviceReports  ServiceReport[]
+
+  @@map("projects")
+}
+
+model ProjectAssignment {
+  id         Int            @id @default(autoincrement())
+  projectId  Int
+  userId     Int
+  role       AssignmentRole @default(TECHNICIAN)
+  assignedBy Int
+  assignedAt DateTime       @default(now())
+
+  project        Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user           User    @relation("AssignedUser", fields: [userId], references: [id])
+  assignedByUser User    @relation("AssignedBy", fields: [assignedBy], references: [id])
+
+  @@unique([projectId, userId])
+  @@map("project_assignments")
+}
+
+// ─── Site Visits & Work Logs ──────────────────────────────────────────────────
+
+model SiteVisit {
+  id           Int      @id @default(autoincrement())
+  projectId    Int
+  visitedBy    Int
+  visitDate    DateTime @default(now())
+  purpose      String?
+  requirements String?
+  observations String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  project Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  visitor User        @relation("SiteVisitor", fields: [visitedBy], references: [id])
+  photos  SitePhoto[]
+
+  @@map("site_visits")
+}
+
+model SitePhoto {
+  id          Int      @id @default(autoincrement())
+  siteVisitId Int?
+  workLogId   Int?
+  url         String
+  caption     String?
+  uploadedBy  Int
+  createdAt   DateTime @default(now())
+
+  siteVisit SiteVisit? @relation(fields: [siteVisitId], references: [id], onDelete: Cascade)
+  workLog   WorkLog?   @relation(fields: [workLogId], references: [id], onDelete: Cascade)
+  uploader  User       @relation("PhotoUploader", fields: [uploadedBy], references: [id])
+
+  @@map("site_photos")
+}
+
+model WorkLog {
+  id          Int      @id @default(autoincrement())
+  projectId   Int
+  userId      Int
+  logDate     DateTime @default(now())
+  hoursWorked Float    @default(0)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User          @relation("WorkLogUser", fields: [userId], references: [id])
+  items   WorkLogItem[]
+  photos  SitePhoto[]
+
+  @@map("work_logs")
+}
+
+model WorkLogItem {
+  id          Int          @id @default(autoincrement())
+  workLogId   Int
+  taskType    WorkTaskType @default(OTHER)
+  description String
+  quantity    Float?
+  unit        String?
+  completed   Boolean      @default(true)
+
+  workLog WorkLog @relation(fields: [workLogId], references: [id], onDelete: Cascade)
+
+  @@map("work_log_items")
+}
+
+// ─── Service Reports ──────────────────────────────────────────────────────────
+
+model ServiceReport {
+  id                  Int          @id @default(autoincrement())
+  reportNumber        String       @unique
+  projectId           Int
+  generatedBy         Int
+  summary             String?
+  recommendations     String?
+  status              ReportStatus @default(DRAFT)
+  clientSignatureUrl  String?
+  managerSignatureUrl String?
+  clientSignedAt      DateTime?
+  managerSignedAt     DateTime?
+  approvedAt          DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  project         Project          @relation(fields: [projectId], references: [id])
+  generatedByUser User             @relation("ReportGenerator", fields: [generatedBy], references: [id])
+  activities      ReportActivity[]
+
+  @@map("service_reports")
+}
+
+model ReportActivity {
+  id          Int       @id @default(autoincrement())
+  reportId    Int
+  category    String
+  description String
+  completedAt DateTime?
+  sortOrder   Int       @default(0)
+
+  report ServiceReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@map("report_activities")
+}
+
+// ─── New Enums ────────────────────────────────────────────────────────────────
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CLOSED
+  CANCELLED
+}
+
+enum AssignmentRole {
+  TEAM_LEADER
+  TECHNICIAN
+  SUPERVISOR
+}
+
+enum WorkTaskType {
+  CABLE_INSTALLATION
+  PVC_INSTALLATION
+  TESTING
+  COMMISSIONING
+  INSPECTION
+  OTHER
+}
+
+enum ReportStatus {
+  DRAFT
+  PENDING_SIGNATURES
+  APPROVED
+  REJECTED
+}
+
+// ─── Approval Workflows ───────────────────────────────────────────────────────
+
+model ApprovalRequest {
+  id           Int            @id @default(autoincrement())
+  type         ApprovalType
+  status       ApprovalStatus @default(PENDING)
+  title        String
+  description  String?
+  referenceId  Int?
+  referenceType String?
+  requestedBy  Int
+  assignedTo   Int?
+  decidedBy    Int?
+  decidedAt    DateTime?
+  decisionNote String?
+  priority     ApprovalPriority @default(NORMAL)
+  dueDate      DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  requester    User           @relation("ApprovalRequester", fields: [requestedBy], references: [id])
+  assignee     User?          @relation("ApprovalAssignee", fields: [assignedTo], references: [id])
+  decider      User?          @relation("ApprovalDecider", fields: [decidedBy], references: [id])
+
+  @@map("approval_requests")
+}
+
+// ─── Documents ────────────────────────────────────────────────────────────────
+
+model Document {
+  id          Int            @id @default(autoincrement())
+  title       String
+  description String?
+  category    String         @default("General")
+  fileUrl     String
+  fileName    String
+  fileSize    Int?
+  mimeType    String?
+  version     Int            @default(1)
+  status      DocumentStatus @default(ACTIVE)
+  projectId   Int?
+  clientId    Int?
+  uploadedBy  Int
+  tags        String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  uploader    User           @relation("DocumentUploader", fields: [uploadedBy], references: [id])
+  versions    DocumentVersion[]
+
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id          Int      @id @default(autoincrement())
+  documentId  Int
+  version     Int
+  fileUrl     String
+  fileName    String
+  fileSize    Int?
+  uploadedBy  Int
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  uploader    User     @relation("VersionUploader", fields: [uploadedBy], references: [id])
+
+  @@map("document_versions")
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+model Notification {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  type      NotificationType
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user      User             @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// ─── Audit Logs ───────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id           Int      @id @default(autoincrement())
+  userId       Int?
+  action       String
+  module       String
+  resourceId   String?
+  resourceType String?
+  oldValues    String?
+  newValues    String?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  user         User?    @relation("AuditUser", fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+// ─── New Enums ────────────────────────────────────────────────────────────────
+
+enum ApprovalType {
+  QUOTATION
+  PURCHASE_ORDER
+  PAYMENT
+  INVENTORY_ADJUSTMENT
+  PROJECT_CLOSURE
+  USER_CREATION
+  ROLE_CHANGE
+  DOCUMENT
+  OTHER
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ApprovalPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum DocumentStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+  APPROVAL_REQUIRED
+  APPROVAL_DECIDED
+  LOW_STOCK
+  INVOICE_OVERDUE
+  PROJECT_UPDATE
+  PAYMENT_RECEIVED
+  ASSIGNMENT
+}

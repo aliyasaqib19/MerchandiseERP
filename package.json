@@ -1,0 +1,66 @@
+{
+  "name": "merchandise-erp",
+  "version": "1.0.0",
+  "description": "Merchandise ERP — Enterprise Operations & Resource Management Platform",
+  "main": "electron/main.js",
+  "author": "Merchandise ERP",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build:client": "cd client && npm run build",
+    "build:installer": "node scripts/build.js",
+    "dist": "npm run build:client && npm run build:installer"
+  },
+  "dependencies": {
+    "embedded-postgres": "^18.4.0-beta.17"
+  },
+  "devDependencies": {
+    "electron": "^33.4.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.merchandise.erp",
+    "productName": "Merchandise ERP",
+    "copyright": "Copyright © 2025 Merchandise ERP",
+    "directories": {
+      "output": "dist-installer"
+    },
+    "asarUnpack": [
+      "node_modules/@embedded-postgres/**/*",
+      "node_modules/embedded-postgres/**/*"
+    ],
+    "files": [
+      "electron/**/*",
+      "server/**/*",
+      "!server/node_modules/**/*",
+      "server/node_modules/**/*",
+      "!server/prisma/migrations/.gitkeep",
+      "!**/.env",
+      "!**/logs/**"
+    ],
+    "extraResources": [
+      {
+        "from": "server",
+        "to": "server",
+        "filter": ["**/*", "!node_modules/**"]
+      },
+      {
+        "from": "server/node_modules",
+        "to": "server/node_modules"
+      }
+    ],
+    "win": {
+      "target": [
+        { "target": "zip", "arch": ["x64"] }
+      ],
+      "icon": "electron/assets/icon.ico"
+    },
+    "extraFiles": [
+      {
+        "from": "node_modules/embedded-postgres",
+        "to": "resources/embedded-postgres"
+      }
+    ]
+  }
+}
