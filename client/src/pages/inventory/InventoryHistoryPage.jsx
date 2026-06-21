@@ -48,6 +48,31 @@ export default function InventoryHistoryPage() {
       )
     : transactions;
 
+  function exportCSV() {
+    const rows = [
+      ['Date', 'Product', 'SKU', 'Type', 'Quantity', 'Balance After', 'Reference', 'Notes', 'Created By'],
+      ...filtered.map((tx) => [
+        new Date(tx.createdAt).toLocaleString(),
+        tx.product?.name || '',
+        tx.product?.sku || '',
+        tx.type,
+        tx.quantity,
+        tx.balanceAfter,
+        tx.reference || '',
+        tx.notes || '',
+        tx.user?.fullName || '',
+      ]),
+    ];
+    const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `stock-movements-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-5">
       {/* Header */}
@@ -56,7 +81,7 @@ export default function InventoryHistoryPage() {
           <h1 className="text-2xl font-bold">Inventory History</h1>
           <p className="text-muted-foreground text-sm mt-0.5">All stock movements and adjustments</p>
         </div>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" onClick={exportCSV}>
           <Download className="w-4 h-4" /> Export
         </Button>
       </div>

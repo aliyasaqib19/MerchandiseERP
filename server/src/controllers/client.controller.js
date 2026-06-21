@@ -228,6 +228,25 @@ async function getContacts(req, res) {
   res.json(contacts);
 }
 
+async function getAllContacts(req, res) {
+  const { search } = req.query;
+  const where = {};
+  if (search) {
+    where.OR = [
+      { fullName: { contains: search, mode: 'insensitive' } },
+      { email:    { contains: search, mode: 'insensitive' } },
+      { phone:    { contains: search, mode: 'insensitive' } },
+      { client:   { companyName: { contains: search, mode: 'insensitive' } } },
+    ];
+  }
+  const contacts = await prisma.contact.findMany({
+    where,
+    include: { client: { select: { id: true, companyName: true, status: true } } },
+    orderBy: [{ isPrimary: 'desc' }, { fullName: 'asc' }],
+  });
+  res.json(contacts);
+}
+
 async function createContact(req, res) {
   const clientId = Number(req.params.id);
   const { fullName, title, email, phone, mobile, isPrimary } = req.body;
@@ -389,7 +408,7 @@ async function getIndustries(req, res) {
 module.exports = {
   getStats,
   getClients, getClient, createClient, updateClient, deleteClient,
-  getContacts, createContact, updateContact, deleteContact,
+  getContacts, getAllContacts, createContact, updateContact, deleteContact,
   getNotes, createNote, deleteNote,
   getLedger, createTransaction, deleteTransaction,
   getIndustries,

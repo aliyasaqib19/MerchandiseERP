@@ -25,6 +25,7 @@ import InventoryHistoryPage from './pages/inventory/InventoryHistoryPage';
 import ClientsPage from './pages/clients/ClientsPage';
 import ClientDetailPage from './pages/clients/ClientDetailPage';
 import ClientLedgerPage from './pages/clients/ClientLedgerPage';
+import ContactsPage from './pages/clients/ContactsPage';
 
 // Sales
 import SalesDashboard from './pages/sales/SalesDashboard';
@@ -98,6 +99,7 @@ export default function App() {
 
             {/* ── CRM ── */}
             <Route path="/clients" element={<Guarded permission="CLIENTS_VIEW"><ClientsPage /></Guarded>} />
+            <Route path="/clients/contacts" element={<Guarded permission="CLIENTS_VIEW"><ContactsPage /></Guarded>} />
             <Route path="/clients/:id" element={<Guarded permission="CLIENTS_VIEW"><ClientDetailPage /></Guarded>} />
             <Route path="/clients/:id/ledger" element={<Guarded permission="CLIENTS_VIEW"><ClientLedgerPage /></Guarded>} />
 

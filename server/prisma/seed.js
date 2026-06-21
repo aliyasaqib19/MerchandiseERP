@@ -370,6 +370,419 @@ async function main() {
     });
   }
 
+  // ── Extra users ───────────────────────────────────────────────────────────────
+  const salesRole = await prisma.role.findFirst({ where: { name: 'Sales Manager' } });
+  const techRole  = await prisma.role.findFirst({ where: { name: 'Technician' } });
+
+  const salesHash = await bcrypt.hash('Sales@12345', 12);
+  const techHash  = await bcrypt.hash('Tech@12345', 12);
+
+  const salesUser = await prisma.user.upsert({
+    where: { email: 'sales@inventoria.com' },
+    update: {},
+    create: { fullName: 'Ali Hassan', email: 'sales@inventoria.com', passwordHash: salesHash, branchId: branch.id, roleId: salesRole?.id || adminRole.id, status: 'ACTIVE' },
+  });
+
+  const techUser = await prisma.user.upsert({
+    where: { email: 'tech@inventoria.com' },
+    update: {},
+    create: { fullName: 'Usman Khan', email: 'tech@inventoria.com', passwordHash: techHash, branchId: branch.id, roleId: techRole?.id || adminRole.id, status: 'ACTIVE' },
+  });
+
+  // ── Quotations ─────────────────────────────────────────────────────────────
+  console.log('Seeding quotations...');
+  const client1 = await prisma.client.findFirst({ where: { companyName: 'Gulf Telecom Solutions' } });
+  const client2 = await prisma.client.findFirst({ where: { companyName: 'Al-Barakah Contracting LLC' } });
+  const client3 = await prisma.client.findFirst({ where: { companyName: 'Emirates Networks LLC' } });
+
+  const prodSwitch = await prisma.product.findFirst({ where: { sku: 'NET-SW-24P-GIG' } });
+  const prodPatch  = await prisma.product.findFirst({ where: { sku: 'NET-PATCH-PAN-24' } });
+  const prodCable  = await prisma.product.findFirst({ where: { sku: 'CAB-UTP-CAT6-305' } });
+  const prodFiber  = await prisma.product.findFirst({ where: { sku: 'CAB-FIB-SM-500' } });
+
+  const year = new Date().getFullYear();
+
+  if (client1 && prodSwitch && !await prisma.quotation.findFirst({ where: { quotationNumber: `QUO-${year}-0001` } })) {
+    await prisma.quotation.create({
+      data: {
+        quotationNumber: `QUO-${year}-0001`,
+        clientId: client1.id,
+        createdBy: salesUser.id,
+        status: 'APPROVED',
+        validUntil: new Date(Date.now() + 30 * 86400000),
+        notes: 'Network infrastructure upgrade for main office',
+        discountType: 'PERCENTAGE', discountValue: 5, discountAmount: 600,
+        taxRate: 0, taxAmount: 0,
+        subtotal: 12000, totalAmount: 11400,
+        items: {
+          create: [
+            { productId: prodSwitch.id, description: 'Managed Switch 24-Port Gigabit', quantity: 8, unitPrice: 1200, discount: 0, total: 9600 },
+            { productId: prodPatch.id,  description: 'Patch Panel 24-Port Cat6',       quantity: 16, unitPrice: 140, discount: 0, total: 2240 },
+          ],
+        },
+      },
+    });
+  }
+
+  if (client2 && prodCable && !await prisma.quotation.findFirst({ where: { quotationNumber: `QUO-${year}-0002` } })) {
+    await prisma.quotation.create({
+      data: {
+        quotationNumber: `QUO-${year}-0002`,
+        clientId: client2.id,
+        createdBy: salesUser.id,
+        status: 'SENT',
+        validUntil: new Date(Date.now() + 15 * 86400000),
+        notes: 'Structured cabling for new building',
+        discountType: 'FIXED', discountValue: 0, discountAmount: 0,
+        taxRate: 0, taxAmount: 0,
+        subtotal: 7200, totalAmount: 7200,
+        items: {
+          create: [
+            { productId: prodCable.id, description: 'UTP Cable Cat6 (305m Box)', quantity: 40, unitPrice: 120, discount: 0, total: 4800 },
+            { productId: prodPatch.id, description: 'Patch Panel 24-Port Cat6',  quantity: 17, unitPrice: 140, discount: 0, total: 2380 },
+          ],
+        },
+      },
+    });
+  }
+
+  if (client3 && prodFiber && !await prisma.quotation.findFirst({ where: { quotationNumber: `QUO-${year}-0003` } })) {
+    await prisma.quotation.create({
+      data: {
+        quotationNumber: `QUO-${year}-0003`,
+        clientId: client3.id,
+        createdBy: salesUser.id,
+        status: 'DRAFT',
+        validUntil: new Date(Date.now() + 20 * 86400000),
+        notes: 'Fiber backbone installation',
+        discountType: 'PERCENTAGE', discountValue: 0, discountAmount: 0,
+        taxRate: 0, taxAmount: 0,
+        subtotal: 3600, totalAmount: 3600,
+        items: {
+          create: [
+            { productId: prodFiber.id, description: 'Fiber Cable Single-Mode OS2 (500m)', quantity: 8, unitPrice: 450, discount: 0, total: 3600 },
+          ],
+        },
+      },
+    });
+  }
+
+  // ── Purchase Orders ─────────────────────────────────────────────────────────
+  console.log('Seeding purchase orders...');
+  const quot1 = await prisma.quotation.findFirst({ where: { quotationNumber: `QUO-${year}-0001` } });
+  const quot2 = await prisma.quotation.findFirst({ where: { quotationNumber: `QUO-${year}-0002` } });
+
+  if (client1 && !await prisma.purchaseOrder.findFirst({ where: { poNumber: `PO-${year}-0001` } })) {
+    await prisma.purchaseOrder.create({
+      data: {
+        poNumber: `PO-${year}-0001`,
+        clientId: client1.id,
+        quotationId: quot1?.id || null,
+        createdBy: salesUser.id,
+        status: 'APPROVED',
+        notes: 'Approved PO for network upgrade',
+        taxRate: 0, taxAmount: 0,
+        subtotal: 11400, totalAmount: 11400,
+        poDate: new Date(Date.now() - 10 * 86400000),
+        expectedDelivery: new Date(Date.now() + 20 * 86400000),
+        items: {
+          create: [
+            { productId: prodSwitch?.id || null, description: 'Managed Switch 24-Port Gigabit', quantity: 8,  unitPrice: 1200, total: 9600 },
+            { productId: prodPatch?.id  || null, description: 'Patch Panel 24-Port Cat6',       quantity: 16, unitPrice: 140,  total: 2240 },
+          ],
+        },
+      },
+    });
+  }
+
+  if (client2 && !await prisma.purchaseOrder.findFirst({ where: { poNumber: `PO-${year}-0002` } })) {
+    await prisma.purchaseOrder.create({
+      data: {
+        poNumber: `PO-${year}-0002`,
+        clientId: client2.id,
+        quotationId: quot2?.id || null,
+        createdBy: salesUser.id,
+        status: 'PENDING',
+        notes: 'Awaiting approval',
+        taxRate: 0, taxAmount: 0,
+        subtotal: 7200, totalAmount: 7200,
+        poDate: new Date(),
+        items: {
+          create: [
+            { productId: prodCable?.id || null, description: 'UTP Cable Cat6 (305m Box)', quantity: 40, unitPrice: 120, total: 4800 },
+            { productId: prodPatch?.id || null, description: 'Patch Panel 24-Port Cat6',  quantity: 17, unitPrice: 140, total: 2380 },
+          ],
+        },
+      },
+    });
+  }
+
+  // ── Sales Orders ────────────────────────────────────────────────────────────
+  console.log('Seeding sales orders...');
+  const po1 = await prisma.purchaseOrder.findFirst({ where: { poNumber: `PO-${year}-0001` } });
+
+  if (client1 && !await prisma.sale.findFirst({ where: { saleNumber: `SALE-${year}-0001` } })) {
+    const sale = await prisma.sale.create({
+      data: {
+        saleNumber: `SALE-${year}-0001`,
+        clientId: client1.id,
+        quotationId: quot1?.id || null,
+        poId: po1?.id || null,
+        createdBy: salesUser.id,
+        status: 'DELIVERED',
+        notes: 'Network equipment — delivered and installed',
+        taxRate: 0, taxAmount: 0, discountAmount: 0,
+        subtotal: 11400, totalAmount: 11400,
+        saleDate: new Date(Date.now() - 5 * 86400000),
+        items: {
+          create: [
+            { productId: prodSwitch?.id || null, description: 'Managed Switch 24-Port Gigabit', quantity: 8,  unitPrice: 1200, costPrice: 850, discount: 0, total: 9600 },
+            { productId: prodPatch?.id  || null, description: 'Patch Panel 24-Port Cat6',       quantity: 16, unitPrice: 140,  costPrice: 95,  discount: 0, total: 2240 },
+          ],
+        },
+      },
+    });
+
+    // Create client invoice for this sale
+    const invoice = await prisma.clientTransaction.create({
+      data: {
+        clientId: client1.id, type: 'INVOICE', amount: 11400,
+        description: `Invoice for Sale ${sale.saleNumber}`,
+        reference: sale.saleNumber, date: new Date(Date.now() - 5 * 86400000),
+        createdBy: salesUser.id,
+      },
+    });
+    await prisma.sale.update({ where: { id: sale.id }, data: { invoiceId: invoice.id } });
+  }
+
+  if (client3 && !await prisma.sale.findFirst({ where: { saleNumber: `SALE-${year}-0002` } })) {
+    await prisma.sale.create({
+      data: {
+        saleNumber: `SALE-${year}-0002`,
+        clientId: client3.id,
+        createdBy: salesUser.id,
+        status: 'CONFIRMED',
+        notes: 'Fiber cables — confirmed, awaiting delivery',
+        taxRate: 0, taxAmount: 0, discountAmount: 0,
+        subtotal: 3600, totalAmount: 3600,
+        saleDate: new Date(Date.now() - 2 * 86400000),
+        items: {
+          create: [
+            { productId: prodFiber?.id || null, description: 'Fiber Cable Single-Mode OS2 (500m)', quantity: 8, unitPrice: 450, costPrice: 320, discount: 0, total: 3600 },
+          ],
+        },
+      },
+    });
+  }
+
+  // ── Projects ────────────────────────────────────────────────────────────────
+  console.log('Seeding projects...');
+  const sale1 = await prisma.sale.findFirst({ where: { saleNumber: `SALE-${year}-0001` } });
+
+  if (!await prisma.project.findFirst({ where: { projectNumber: `PROJ-${year}-0001` } })) {
+    const proj = await prisma.project.create({
+      data: {
+        projectNumber: `PROJ-${year}-0001`,
+        title: 'Gulf Telecom – Network Infrastructure Upgrade',
+        clientId: client1.id,
+        saleId: sale1?.id || null,
+        managerId: admin.id,
+        location: 'Business Bay Tower 3',
+        address: 'Business Bay, Tower 3, Floor 12',
+        city: 'Dubai',
+        status: 'ACTIVE',
+        startDate: new Date(Date.now() - 7 * 86400000),
+        estimatedEndDate: new Date(Date.now() + 30 * 86400000),
+        notes: 'Full network infrastructure upgrade including switches, patch panels and structured cabling.',
+        createdBy: admin.id,
+      },
+    });
+
+    await prisma.projectAssignment.create({
+      data: { projectId: proj.id, userId: techUser.id, role: 'TECHNICIAN', assignedBy: admin.id },
+    });
+
+    await prisma.siteVisit.create({
+      data: {
+        projectId: proj.id, visitedBy: techUser.id,
+        visitDate: new Date(Date.now() - 5 * 86400000),
+        purpose: 'Initial site survey and measurement',
+        observations: 'Completed full site survey. 8 switch locations identified, cable routing planned.',
+        notes: 'All areas accessible. No structural changes needed.',
+      },
+    });
+
+    await prisma.workLog.create({
+      data: {
+        projectId: proj.id, userId: techUser.id,
+        logDate: new Date(Date.now() - 3 * 86400000),
+        hoursWorked: 8,
+        notes: 'Installed patch panels and cable trays in all server rooms.',
+      },
+    });
+  }
+
+  if (client2 && !await prisma.project.findFirst({ where: { projectNumber: `PROJ-${year}-0002` } })) {
+    const proj2 = await prisma.project.create({
+      data: {
+        projectNumber: `PROJ-${year}-0002`,
+        title: 'Al-Barakah – CCTV & Access Control',
+        clientId: client2.id,
+        managerId: admin.id,
+        location: 'Industrial Area Block 7',
+        city: 'Abu Dhabi',
+        status: 'PLANNING',
+        startDate: new Date(Date.now() + 7 * 86400000),
+        estimatedEndDate: new Date(Date.now() + 60 * 86400000),
+        notes: 'CCTV cameras, access control system and security cabling.',
+        createdBy: admin.id,
+      },
+    });
+
+    await prisma.projectAssignment.create({
+      data: { projectId: proj2.id, userId: techUser.id, role: 'TECHNICIAN', assignedBy: admin.id },
+    });
+  }
+
+  // ── Approvals ───────────────────────────────────────────────────────────────
+  console.log('Seeding approvals...');
+  if (!await prisma.approvalRequest.findFirst({ where: { title: 'Approve Quotation QUO-0001' } })) {
+    await prisma.approvalRequest.create({
+      data: {
+        type: 'QUOTATION',
+        title: 'Approve Quotation QUO-0001',
+        description: 'Gulf Telecom network upgrade quotation for PKR 11,400. Please review and approve.',
+        requestedBy: salesUser.id,
+        assignedTo: admin.id,
+        priority: 'HIGH',
+        status: 'APPROVED',
+        decidedBy: admin.id,
+        decidedAt: new Date(Date.now() - 8 * 86400000),
+        decisionNote: 'Approved. Proceed with purchase order.',
+      },
+    });
+  }
+
+  if (!await prisma.approvalRequest.findFirst({ where: { title: 'Stock Adjustment – Cable Tray' } })) {
+    await prisma.approvalRequest.create({
+      data: {
+        type: 'INVENTORY_ADJUSTMENT',
+        title: 'Stock Adjustment – Cable Tray',
+        description: 'Requesting emergency stock adjustment for Cable Tray 100mm. Current stock is critically low (1 unit, threshold 20).',
+        requestedBy: techUser.id,
+        assignedTo: admin.id,
+        priority: 'HIGH',
+        status: 'PENDING',
+      },
+    });
+  }
+
+  if (!await prisma.approvalRequest.findFirst({ where: { title: 'Approve Purchase Order PO-0002' } })) {
+    await prisma.approvalRequest.create({
+      data: {
+        type: 'PURCHASE_ORDER',
+        title: 'Approve Purchase Order PO-0002',
+        description: 'Al-Barakah structured cabling PO for PKR 7,200. Awaiting management sign-off.',
+        requestedBy: salesUser.id,
+        assignedTo: admin.id,
+        priority: 'NORMAL',
+        status: 'PENDING',
+      },
+    });
+  }
+
+  // ── Documents ───────────────────────────────────────────────────────────────
+  console.log('Seeding documents...');
+  const proj1 = await prisma.project.findFirst({ where: { projectNumber: `PROJ-${year}-0001` } });
+
+  if (!await prisma.document.findFirst({ where: { title: 'Network Diagram – Gulf Telecom' } })) {
+    await prisma.document.create({
+      data: {
+        title: 'Network Diagram – Gulf Telecom',
+        description: 'Full network topology diagram for the Gulf Telecom Business Bay project.',
+        category: 'Technical',
+        fileUrl: 'https://example.com/docs/network-diagram-gulf-telecom.pdf',
+        fileName: 'network-diagram-gulf-telecom.pdf',
+        mimeType: 'application/pdf',
+        fileSize: 245760,
+        projectId: proj1?.id || null,
+        clientId: client1?.id || null,
+        uploadedBy: admin.id,
+        version: 1,
+      },
+    });
+  }
+
+  if (!await prisma.document.findFirst({ where: { title: 'Quotation QUO-0001 – Signed Copy' } })) {
+    await prisma.document.create({
+      data: {
+        title: 'Quotation QUO-0001 – Signed Copy',
+        description: 'Client-signed quotation for Gulf Telecom network upgrade.',
+        category: 'Contracts',
+        fileUrl: 'https://example.com/docs/quo-0001-signed.pdf',
+        fileName: 'quo-0001-signed.pdf',
+        mimeType: 'application/pdf',
+        fileSize: 128000,
+        clientId: client1?.id || null,
+        uploadedBy: salesUser.id,
+        version: 1,
+      },
+    });
+  }
+
+  if (!await prisma.document.findFirst({ where: { title: 'Site Survey Report – Gulf Telecom' } })) {
+    await prisma.document.create({
+      data: {
+        title: 'Site Survey Report – Gulf Telecom',
+        description: 'Initial site survey report with photos and cable routing plan.',
+        category: 'Reports',
+        fileUrl: 'https://example.com/docs/site-survey-gulf-telecom.pdf',
+        fileName: 'site-survey-gulf-telecom.pdf',
+        mimeType: 'application/pdf',
+        fileSize: 512000,
+        projectId: proj1?.id || null,
+        uploadedBy: techUser.id,
+        version: 1,
+      },
+    });
+  }
+
+  // ── Notifications ────────────────────────────────────────────────────────────
+  console.log('Seeding notifications...');
+  if (!await prisma.notification.findFirst({ where: { title: 'Low Stock Alert: Cable Tray 100mm' } })) {
+    await prisma.notification.create({
+      data: {
+        userId: admin.id, type: 'LOW_STOCK',
+        title: 'Low Stock Alert: Cable Tray 100mm',
+        message: 'Cable Tray 100mm (2m) is critically low (1 unit). Minimum threshold is 20 units.',
+        link: '/inventory/products',
+      },
+    });
+  }
+
+  if (!await prisma.notification.findFirst({ where: { title: 'New Approval Request: Stock Adjustment' } })) {
+    await prisma.notification.create({
+      data: {
+        userId: admin.id, type: 'APPROVAL_REQUIRED',
+        title: 'New Approval Request: Stock Adjustment',
+        message: 'Usman Khan has submitted a stock adjustment request for Cable Tray.',
+        link: '/approvals',
+      },
+    });
+  }
+
+  if (!await prisma.notification.findFirst({ where: { title: 'Sale SALE-0001 Delivered' } })) {
+    await prisma.notification.create({
+      data: {
+        userId: admin.id, type: 'SUCCESS',
+        title: 'Sale SALE-0001 Delivered',
+        message: 'Sale for Gulf Telecom Solutions has been marked as delivered.',
+        link: '/sales/orders',
+        isRead: true,
+      },
+    });
+  }
+
   console.log('Seed complete.');
 }
 

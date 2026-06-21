@@ -9,8 +9,9 @@ const router = Router();
 router.use(authenticate);
 
 // ─── Stats & Meta ─────────────────────────────────────────────────────────────
-router.get('/stats',      authorize('CLIENTS_VIEW'), ctrl.getStats);
-router.get('/industries', authorize('CLIENTS_VIEW'), ctrl.getIndustries);
+router.get('/stats',        authorize('CLIENTS_VIEW'), ctrl.getStats);
+router.get('/industries',   authorize('CLIENTS_VIEW'), ctrl.getIndustries);
+router.get('/all-contacts', authorize('CLIENTS_VIEW'), ctrl.getAllContacts);
 
 // ─── Clients CRUD ─────────────────────────────────────────────────────────────
 router.get('/', authorize('CLIENTS_VIEW'), ctrl.getClients);
