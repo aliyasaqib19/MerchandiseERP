@@ -12,4 +12,4 @@ cmds = [
 ]
 
 [start]
-cmd = "cd server && npx prisma migrate deploy && node prisma/seed.js || true && node src/index.js"
+cmd = "cd server && npx prisma migrate deploy && (node prisma/seed.js || true) && node src/index.js"
