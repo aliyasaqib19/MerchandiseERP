@@ -168,6 +168,38 @@ async function main() {
     },
   });
 
+  // ── Warehouses ────────────────────────────────────────────────────────────
+  console.log('Seeding warehouses...');
+  const warehouseKarachi = await prisma.warehouse.upsert({
+    where: { name: 'Karachi Warehouse' },
+    update: {},
+    create: {
+      name: 'Karachi Warehouse',
+      city: 'Karachi',
+      address: 'Plot 45, SITE Industrial Area, Karachi',
+      contactPerson: 'Imran Siddiqui',
+      phone: '+92 21 3456 7890',
+      status: 'ACTIVE',
+      notes: 'Main warehouse for Karachi and Sindh region',
+      capacity: 5000,
+    },
+  });
+
+  const warehouseLahore = await prisma.warehouse.upsert({
+    where: { name: 'Lahore Warehouse' },
+    update: {},
+    create: {
+      name: 'Lahore Warehouse',
+      city: 'Lahore',
+      address: 'Block C, Sundar Industrial Estate, Lahore',
+      contactPerson: 'Asad Mehmood',
+      phone: '+92 42 3567 8901',
+      status: 'ACTIVE',
+      notes: 'Main warehouse for Lahore and Punjab region',
+      capacity: 4000,
+    },
+  });
+
   // ── Inventory: Categories ──────────────────────────────────────────────────
   console.log('Seeding inventory categories...');
   const CATEGORIES = [
@@ -196,20 +228,20 @@ async function main() {
   const adminUser = await prisma.user.findUnique({ where: { email: 'admin@inventoria.com' } });
 
   const PRODUCTS = [
-    { sku: 'CAB-UTP-CAT6-305', name: 'UTP Cable Cat6 (305m Box)', categoryId: categoryMap['Cables & Wiring'], unitType: 'BOX', quantity: 45, minThreshold: 10, costPrice: 85, sellingPrice: 120 },
-    { sku: 'CAB-UTP-CAT6A-305', name: 'UTP Cable Cat6A (305m Box)', categoryId: categoryMap['Cables & Wiring'], unitType: 'BOX', quantity: 20, minThreshold: 5, costPrice: 140, sellingPrice: 195 },
-    { sku: 'CAB-FIB-SM-500', name: 'Fiber Cable Single-Mode OS2 (500m)', categoryId: categoryMap['Fiber Optics'], unitType: 'ROLL', quantity: 8, minThreshold: 3, costPrice: 320, sellingPrice: 450 },
-    { sku: 'CAB-FIB-MM-300', name: 'Fiber Cable Multi-Mode OM3 (300m)', categoryId: categoryMap['Fiber Optics'], unitType: 'ROLL', quantity: 2, minThreshold: 3, costPrice: 280, sellingPrice: 390 },
-    { sku: 'NET-SW-24P-GIG', name: 'Managed Switch 24-Port Gigabit', categoryId: categoryMap['Network Equipment'], unitType: 'PIECE', quantity: 12, minThreshold: 2, costPrice: 850, sellingPrice: 1200 },
-    { sku: 'NET-SW-48P-GIG', name: 'Managed Switch 48-Port Gigabit', categoryId: categoryMap['Network Equipment'], unitType: 'PIECE', quantity: 5, minThreshold: 2, costPrice: 1400, sellingPrice: 1950 },
-    { sku: 'NET-PATCH-PAN-24', name: 'Patch Panel 24-Port Cat6', categoryId: categoryMap['Network Equipment'], unitType: 'PIECE', quantity: 18, minThreshold: 5, costPrice: 95, sellingPrice: 140 },
-    { sku: 'CON-PVC-20MM-3M', name: 'PVC Conduit 20mm (3m)', categoryId: categoryMap['Conduits & Accessories'], unitType: 'PIECE', quantity: 200, minThreshold: 50, costPrice: 3.5, sellingPrice: 6 },
-    { sku: 'CON-TRAY-100-2M', name: 'Cable Tray 100mm (2m)', categoryId: categoryMap['Conduits & Accessories'], unitType: 'PIECE', quantity: 1, minThreshold: 20, costPrice: 22, sellingPrice: 38 },
-    { sku: 'TOOL-CRIMP-RJ45', name: 'RJ45 Crimping Tool', categoryId: categoryMap['Tools & Equipment'], unitType: 'PIECE', quantity: 8, minThreshold: 3, costPrice: 45, sellingPrice: 75 },
-    { sku: 'TOOL-OTDR-SM', name: 'OTDR Tester Single-Mode', categoryId: categoryMap['Tools & Equipment'], unitType: 'PIECE', quantity: 2, minThreshold: 1, costPrice: 2800, sellingPrice: 3800 },
-    { sku: 'ELE-BREAKER-20A', name: 'Circuit Breaker 20A', categoryId: categoryMap['Electrical Components'], unitType: 'PIECE', quantity: 35, minThreshold: 10, costPrice: 18, sellingPrice: 32 },
-    { sku: 'SAFE-HELMET-HARD', name: 'Safety Hard Hat', categoryId: categoryMap['Safety & PPE'], unitType: 'PIECE', quantity: 15, minThreshold: 5, costPrice: 25, sellingPrice: 45 },
-    { sku: 'SAFE-GLOVES-L', name: 'Safety Gloves (Large)', categoryId: categoryMap['Safety & PPE'], unitType: 'SET', quantity: 40, minThreshold: 10, costPrice: 12, sellingPrice: 22 },
+    { sku: 'CAB-UTP-CAT6-305',  name: 'UTP Cable Cat6 (305m Box)',              categoryId: categoryMap['Cables & Wiring'],        unitType: 'BOX',   quantity: 45,  minThreshold: 10, costPrice: 85,   sellingPrice: 120,  warehouseId: warehouseKarachi.id },
+    { sku: 'CAB-UTP-CAT6A-305', name: 'UTP Cable Cat6A (305m Box)',             categoryId: categoryMap['Cables & Wiring'],        unitType: 'BOX',   quantity: 20,  minThreshold: 5,  costPrice: 140,  sellingPrice: 195,  warehouseId: warehouseKarachi.id },
+    { sku: 'CAB-FIB-SM-500',    name: 'Fiber Cable Single-Mode OS2 (500m)',     categoryId: categoryMap['Fiber Optics'],           unitType: 'ROLL',  quantity: 8,   minThreshold: 3,  costPrice: 320,  sellingPrice: 450,  warehouseId: warehouseKarachi.id },
+    { sku: 'CAB-FIB-MM-300',    name: 'Fiber Cable Multi-Mode OM3 (300m)',      categoryId: categoryMap['Fiber Optics'],           unitType: 'ROLL',  quantity: 2,   minThreshold: 3,  costPrice: 280,  sellingPrice: 390,  warehouseId: warehouseKarachi.id },
+    { sku: 'NET-SW-24P-GIG',    name: 'Managed Switch 24-Port Gigabit',         categoryId: categoryMap['Network Equipment'],      unitType: 'PIECE', quantity: 12,  minThreshold: 2,  costPrice: 850,  sellingPrice: 1200, warehouseId: warehouseKarachi.id },
+    { sku: 'NET-SW-48P-GIG',    name: 'Managed Switch 48-Port Gigabit',         categoryId: categoryMap['Network Equipment'],      unitType: 'PIECE', quantity: 5,   minThreshold: 2,  costPrice: 1400, sellingPrice: 1950, warehouseId: warehouseKarachi.id },
+    { sku: 'NET-PATCH-PAN-24',  name: 'Patch Panel 24-Port Cat6',               categoryId: categoryMap['Network Equipment'],      unitType: 'PIECE', quantity: 18,  minThreshold: 5,  costPrice: 95,   sellingPrice: 140,  warehouseId: warehouseLahore.id },
+    { sku: 'CON-PVC-20MM-3M',   name: 'PVC Conduit 20mm (3m)',                  categoryId: categoryMap['Conduits & Accessories'], unitType: 'PIECE', quantity: 200, minThreshold: 50, costPrice: 3.5,  sellingPrice: 6,    warehouseId: warehouseLahore.id },
+    { sku: 'CON-TRAY-100-2M',   name: 'Cable Tray 100mm (2m)',                  categoryId: categoryMap['Conduits & Accessories'], unitType: 'PIECE', quantity: 1,   minThreshold: 20, costPrice: 22,   sellingPrice: 38,   warehouseId: warehouseLahore.id },
+    { sku: 'TOOL-CRIMP-RJ45',   name: 'RJ45 Crimping Tool',                     categoryId: categoryMap['Tools & Equipment'],      unitType: 'PIECE', quantity: 8,   minThreshold: 3,  costPrice: 45,   sellingPrice: 75,   warehouseId: warehouseLahore.id },
+    { sku: 'TOOL-OTDR-SM',      name: 'OTDR Tester Single-Mode',                categoryId: categoryMap['Tools & Equipment'],      unitType: 'PIECE', quantity: 2,   minThreshold: 1,  costPrice: 2800, sellingPrice: 3800, warehouseId: warehouseLahore.id },
+    { sku: 'ELE-BREAKER-20A',   name: 'Circuit Breaker 20A',                    categoryId: categoryMap['Electrical Components'],  unitType: 'PIECE', quantity: 35,  minThreshold: 10, costPrice: 18,   sellingPrice: 32,   warehouseId: warehouseLahore.id },
+    { sku: 'SAFE-HELMET-HARD',  name: 'Safety Hard Hat',                        categoryId: categoryMap['Safety & PPE'],           unitType: 'PIECE', quantity: 15,  minThreshold: 5,  costPrice: 25,   sellingPrice: 45,   warehouseId: warehouseLahore.id },
+    { sku: 'SAFE-GLOVES-L',     name: 'Safety Gloves (Large)',                  categoryId: categoryMap['Safety & PPE'],           unitType: 'SET',   quantity: 40,  minThreshold: 10, costPrice: 12,   sellingPrice: 22,   warehouseId: warehouseLahore.id },
   ];
 
   for (const p of PRODUCTS) {
@@ -224,6 +256,7 @@ async function main() {
             type: 'STOCK_IN',
             quantity: p.quantity,
             balanceAfter: p.quantity,
+            warehouseId: p.warehouseId || null,
             notes: 'Initial stock — seed data',
             createdBy: adminUser.id,
           },

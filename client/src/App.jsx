@@ -21,6 +21,10 @@ import ProductListPage from './pages/inventory/ProductListPage';
 import ProductDetailPage from './pages/inventory/ProductDetailPage';
 import InventoryHistoryPage from './pages/inventory/InventoryHistoryPage';
 
+// Warehouses
+import WarehousesPage from './pages/warehouses/WarehousesPage';
+import WarehouseDetailPage from './pages/warehouses/WarehouseDetailPage';
+
 // CRM
 import ClientsPage from './pages/clients/ClientsPage';
 import ClientDetailPage from './pages/clients/ClientDetailPage';
@@ -90,6 +94,10 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
+
+            {/* ── Warehouses ── */}
+            <Route path="/warehouses"     element={<Guarded permission="INVENTORY_VIEW"><WarehousesPage /></Guarded>} />
+            <Route path="/warehouses/:id" element={<Guarded permission="INVENTORY_VIEW"><WarehouseDetailPage /></Guarded>} />
 
             {/* ── Inventory ── */}
             <Route path="/inventory" element={<Guarded permission="INVENTORY_VIEW"><InventoryDashboard /></Guarded>} />

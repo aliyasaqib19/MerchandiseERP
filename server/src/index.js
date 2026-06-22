@@ -23,6 +23,7 @@ const documentRoutes       = require('./routes/document.routes');
 const notificationRoutes   = require('./routes/notification.routes');
 const auditRoutes          = require('./routes/audit.routes');
 const reportRoutes         = require('./routes/report.routes');
+const warehouseRoutes      = require('./routes/warehouse.routes');
 
 const app = express();
 
@@ -38,6 +39,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/permissions', permissionRoutes);
+app.use('/api/warehouses',      warehouseRoutes);
 app.use('/api/inventory',       inventoryRoutes);
 app.use('/api/clients',         clientRoutes);
 app.use('/api/quotations',      quotationRoutes);

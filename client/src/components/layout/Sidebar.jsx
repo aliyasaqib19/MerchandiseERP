@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard,
   Package,
@@ -32,9 +33,12 @@ import {
   Lock,
   TrendingUp,
   UserCircle,
+  Warehouse,
+  Plus,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
+import api from '../../lib/api';
 
 // Full nav tree — each item can have children.
 // permission gates visibility; a parent is hidden if zero children are visible.
@@ -251,9 +255,147 @@ export function Sidebar({ open, onClose }) {
               </div>
             );
           })}
+
+          {/* Warehouses section — dynamic */}
+          {hasPermission('INVENTORY_VIEW') && (
+            <WarehousesSection onLinkClick={onClose} />
+          )}
         </nav>
       </aside>
     </>
+  );
+}
+
+function WarehousesSection({ onLinkClick }) {
+  const location = useLocation();
+
+  const { data: warehouses = [] } = useQuery({
+    queryKey: ['warehouses'],
+    queryFn: () => api.get('/warehouses').then((r) => r.data),
+    staleTime: 60_000,
+  });
+
+  return (
+    <div>
+      <p className="px-3 mb-1.5 text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
+        Warehouses
+      </p>
+      <div className="space-y-0.5">
+        {/* All Warehouses link */}
+        <NavLink
+          to="/warehouses"
+          end
+          onClick={onLinkClick}
+          className={({ isActive }) =>
+            cn(
+              'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all',
+              isActive
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+            )
+          }
+        >
+          <Warehouse className="w-4 h-4 flex-shrink-0" />
+          <span className="flex-1">All Warehouses</span>
+          <span className="text-[10px] bg-slate-700 text-slate-300 rounded-full px-1.5 py-0.5">
+            {warehouses.length}
+          </span>
+        </NavLink>
+
+        {/* Each warehouse as expandable group */}
+        {warehouses.map((wh) => (
+          <WarehouseNavGroup
+            key={wh.id}
+            warehouse={wh}
+            onLinkClick={onLinkClick}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WarehouseNavGroup({ warehouse, onLinkClick }) {
+  const location = useLocation();
+  const base = `/warehouses/${warehouse.id}`;
+
+  const isAnyChildActive = location.pathname.startsWith(base);
+  const [expanded, setExpanded] = useState(isAnyChildActive);
+
+  const children = [
+    { label: 'Overview',        icon: PieChart,       tab: 'overview' },
+    { label: 'Products',        icon: Box,            tab: 'products' },
+    { label: 'Stock Movements', icon: ArrowLeftRight, tab: 'movements' },
+  ];
+
+  return (
+    <div>
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className={cn(
+          'flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm transition-all',
+          isAnyChildActive
+            ? 'text-slate-100 bg-slate-800'
+            : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+        )}
+      >
+        <Warehouse className="w-4 h-4 flex-shrink-0 text-primary/80" />
+        <span className="flex-1 text-left truncate">{warehouse.name}</span>
+        <ChevronDown
+          className={cn('w-3.5 h-3.5 flex-shrink-0 transition-transform', expanded && 'rotate-180')}
+        />
+      </button>
+
+      {expanded && (
+        <div className="mt-0.5 ml-3 pl-3 border-l border-slate-700/60 space-y-0.5">
+          {/* Full detail page */}
+          <NavLink
+            to={base}
+            end
+            onClick={onLinkClick}
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-2 px-3 py-1.5 rounded-md text-xs transition-all',
+                isActive
+                  ? 'text-primary font-semibold'
+                  : 'text-slate-500 hover:text-slate-200 hover:bg-slate-800/60'
+              )
+            }
+          >
+            <BarChart2 className="w-3.5 h-3.5 flex-shrink-0" />
+            Overview
+          </NavLink>
+
+          <NavLink
+            to={`${base}?tab=products`}
+            onClick={onLinkClick}
+            className={cn(
+              'flex items-center gap-2 px-3 py-1.5 rounded-md text-xs transition-all',
+              location.search === '?tab=products' && location.pathname === base
+                ? 'text-primary font-semibold'
+                : 'text-slate-500 hover:text-slate-200 hover:bg-slate-800/60'
+            )}
+          >
+            <Box className="w-3.5 h-3.5 flex-shrink-0" />
+            Products
+          </NavLink>
+
+          <NavLink
+            to={`${base}?tab=movements`}
+            onClick={onLinkClick}
+            className={cn(
+              'flex items-center gap-2 px-3 py-1.5 rounded-md text-xs transition-all',
+              location.search === '?tab=movements' && location.pathname === base
+                ? 'text-primary font-semibold'
+                : 'text-slate-500 hover:text-slate-200 hover:bg-slate-800/60'
+            )}
+          >
+            <ArrowLeftRight className="w-3.5 h-3.5 flex-shrink-0" />
+            Stock Movements
+          </NavLink>
+        </div>
+      )}
+    </div>
   );
 }
 
