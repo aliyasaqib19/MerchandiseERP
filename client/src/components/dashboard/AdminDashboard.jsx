@@ -1,46 +1,124 @@
+import { useQuery } from '@tanstack/react-query';
 import {
-  Users, Shield, Package, FolderKanban, DollarSign, Activity,
+  Users, Package, DollarSign, ClipboardCheck,
   UserPlus, ShieldPlus,
 } from 'lucide-react';
 import { StatsCard } from './StatsCard';
 import { ActivityFeed } from './ActivityFeed';
 import { QuickActions } from './QuickActions';
-
-const STATS = [
-  { label: 'Total Users',      value: '24',      sub: '3 added this month',   icon: Users,       color: 'blue',   trend: 'up',   trendValue: '+3' },
-  { label: 'Active Roles',     value: '7',       sub: '2 custom roles',        icon: Shield,      color: 'purple', trend: null },
-  { label: 'Total Modules',    value: '8',       sub: 'All systems operational', icon: Activity,  color: 'green',  trend: null },
-  { label: 'Pending Approvals',value: '5',       sub: 'Requires attention',    icon: FolderKanban,color: 'orange', trend: 'up',   trendValue: '+2' },
-];
-
-const ACTIVITY = [
-  { type: 'user',     message: 'New user "Sara Ahmed" added as Sales Manager',   time: '10 min ago' },
-  { type: 'user',     message: 'Role "Warehouse Manager" created by admin',      time: '1 hour ago' },
-  { type: 'project',  message: 'Project "Branch C Cabling" marked as complete',  time: '3 hours ago' },
-  { type: 'finance',  message: 'Payment #PAY-0091 of $4,500 confirmed',          time: 'Yesterday' },
-  { type: 'alert',    message: 'Failed login attempt detected for user@corp.com', time: 'Yesterday' },
-  { type: 'user',     message: 'User "Khalid Saeed" status set to Inactive',     time: '2 days ago' },
-];
+import { useWarehouseStore } from '../../store/warehouseStore';
+import api from '../../lib/api';
 
 const QUICK_ACTIONS = [
-  { label: 'Add User',    icon: UserPlus,   to: '/users',   primary: true },
-  { label: 'New Role',    icon: ShieldPlus, to: '/roles',   primary: false },
+  { label: 'Add User',    icon: UserPlus,   to: '/users',     primary: true },
+  { label: 'New Role',    icon: ShieldPlus, to: '/roles',     primary: false },
   { label: 'Inventory',   icon: Package,    to: '/inventory', primary: false },
-  { label: 'Finance',     icon: DollarSign, to: '/finance', primary: false },
+  { label: 'Finance',     icon: DollarSign, to: '/finance',   primary: false },
 ];
 
+function timeAgo(date) {
+  const diff = Date.now() - new Date(date).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hour${hrs > 1 ? 's' : ''} ago`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return 'Yesterday';
+  return `${days} days ago`;
+}
+
+function money(n) {
+  return `Rs. ${Number(n || 0).toLocaleString()}`;
+}
+
 export function AdminDashboard() {
+  const activeWarehouse = useWarehouseStore((s) => s.activeWarehouse);
+  const whId = activeWarehouse?.id;
+
+  const { data: inventory } = useQuery({
+    queryKey: ['dash-inventory', whId],
+    queryFn: () => api.get('/inventory/stats').then((r) => r.data),
+  });
+  const { data: clients } = useQuery({
+    queryKey: ['dash-clients', whId],
+    queryFn: () => api.get('/clients/stats').then((r) => r.data),
+  });
+  const { data: sales } = useQuery({
+    queryKey: ['dash-sales', whId],
+    queryFn: () => api.get('/sales/stats').then((r) => r.data),
+  });
+  const { data: approvals } = useQuery({
+    queryKey: ['dash-approvals', whId],
+    queryFn: () => api.get('/approvals/stats').then((r) => r.data),
+  });
+
+  const stats = [
+    {
+      label: 'Products', value: String(inventory?.totalProducts ?? '—'),
+      sub: inventory ? `${money(inventory.totalValue)} stock value` : 'Loading…',
+      icon: Package, color: 'blue',
+    },
+    {
+      label: 'Clients', value: String(clients?.totalClients ?? '—'),
+      sub: clients ? `${clients.newThisMonth} new this month` : 'Loading…',
+      icon: Users, color: 'purple',
+      trend: clients?.newThisMonth > 0 ? 'up' : null,
+      trendValue: clients?.newThisMonth > 0 ? `+${clients.newThisMonth}` : undefined,
+    },
+    {
+      label: 'Revenue (This Month)', value: sales ? money(sales.sales?.revenue) : '—',
+      sub: sales ? `${sales.sales?.thisMonth || 0} orders this month` : 'Loading…',
+      icon: DollarSign, color: 'green',
+    },
+    {
+      label: 'Pending Approvals', value: String(approvals?.pending ?? '—'),
+      sub: approvals ? `${approvals.approved || 0} approved` : 'Loading…',
+      icon: ClipboardCheck, color: 'orange',
+      trend: approvals?.pending > 0 ? 'up' : null,
+      trendValue: approvals?.pending > 0 ? `${approvals.pending}` : undefined,
+    },
+  ];
+
+  // Build a real, warehouse-scoped activity feed from recent records
+  const activity = [];
+  for (const s of sales?.recentSales || []) {
+    activity.push({
+      type: 'sale',
+      message: `Sale ${s.saleNumber} for ${s.client?.companyName || 'client'} — ${money(s.totalAmount)} (${s.status})`,
+      time: timeAgo(s.createdAt),
+      _date: new Date(s.createdAt).getTime(),
+    });
+  }
+  for (const c of clients?.recentClients || []) {
+    activity.push({
+      type: 'user',
+      message: `Client "${c.companyName}" added${c.industry ? ` · ${c.industry}` : ''}`,
+      time: timeAgo(c.createdAt),
+      _date: new Date(c.createdAt).getTime(),
+    });
+  }
+  for (const p of (inventory?.lowStockList || []).slice(0, 3)) {
+    activity.push({
+      type: 'alert',
+      message: `Low stock: ${p.name} — ${p.quantity} ${p.unitType || 'units'} left (min ${p.minThreshold})`,
+      time: 'needs reorder',
+      _date: 0,
+    });
+  }
+  activity.sort((a, b) => b._date - a._date);
+
   return (
     <div className="space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {STATS.map((s) => <StatsCard key={s.label} {...s} />)}
+        {stats.map((s) => <StatsCard key={s.label} {...s} />)}
       </div>
 
       {/* Body */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <ActivityFeed items={ACTIVITY} />
+          <ActivityFeed items={activity} />
         </div>
         <div>
           <QuickActions actions={QUICK_ACTIONS} />

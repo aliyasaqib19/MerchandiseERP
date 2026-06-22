@@ -1,4 +1,5 @@
 import { useAuthStore } from '../store/authStore';
+import { useWarehouseStore } from '../store/warehouseStore';
 import { AdminDashboard } from '../components/dashboard/AdminDashboard';
 import { RMDashboard } from '../components/dashboard/RMDashboard';
 import { SalesDashboard } from '../components/dashboard/SalesDashboard';
@@ -24,6 +25,7 @@ const ROLE_GREETING = {
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
+  const activeWarehouse = useWarehouseStore((s) => s.activeWarehouse);
   const roleLower = user?.role?.toLowerCase() || '';
   const greeting = ROLE_GREETING[roleLower] || 'Here\'s what\'s happening today.';
   const Dashboard = getDashboardComponent(user?.role);
@@ -40,7 +42,12 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold">
           {timeGreeting}, {firstName} 👋
         </h1>
-        <p className="text-muted-foreground text-sm mt-0.5">{greeting}</p>
+        <p className="text-muted-foreground text-sm mt-0.5">
+          {greeting}
+          {activeWarehouse && (
+            <> Viewing <span className="font-medium text-foreground">{activeWarehouse.name}</span>.</>
+          )}
+        </p>
         <div className="flex items-center gap-2 mt-2">
           <span className="inline-flex items-center gap-1.5 text-xs bg-muted text-muted-foreground px-2.5 py-1 rounded-full">
             <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
