@@ -24,6 +24,7 @@ const notificationRoutes   = require('./routes/notification.routes');
 const auditRoutes          = require('./routes/audit.routes');
 const reportRoutes         = require('./routes/report.routes');
 const warehouseRoutes      = require('./routes/warehouse.routes');
+const warehouseScope       = require('./middleware/warehouseScope');
 
 const app = express();
 
@@ -34,6 +35,9 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+
+// Establish per-request warehouse context (from x-warehouse-id header)
+app.use('/api', warehouseScope);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);

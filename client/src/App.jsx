@@ -22,8 +22,7 @@ import ProductDetailPage from './pages/inventory/ProductDetailPage';
 import InventoryHistoryPage from './pages/inventory/InventoryHistoryPage';
 
 // Warehouses
-import WarehousesPage from './pages/warehouses/WarehousesPage';
-import WarehouseDetailPage from './pages/warehouses/WarehouseDetailPage';
+import WarehouseSelectPage from './pages/warehouses/WarehouseSelectPage';
 
 // CRM
 import ClientsPage from './pages/clients/ClientsPage';
@@ -90,14 +89,13 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
+          {/* Warehouse picker (auth required, no warehouse needed) */}
+          <Route path="/select-warehouse" element={<WarehouseSelectPage />} />
+
           {/* Protected shell */}
           <Route element={<AppLayout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
-
-            {/* ── Warehouses ── */}
-            <Route path="/warehouses"     element={<Guarded permission="INVENTORY_VIEW"><WarehousesPage /></Guarded>} />
-            <Route path="/warehouses/:id" element={<Guarded permission="INVENTORY_VIEW"><WarehouseDetailPage /></Guarded>} />
 
             {/* ── Inventory ── */}
             <Route path="/inventory" element={<Guarded permission="INVENTORY_VIEW"><InventoryDashboard /></Guarded>} />

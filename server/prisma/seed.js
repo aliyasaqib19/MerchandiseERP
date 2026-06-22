@@ -285,6 +285,7 @@ async function main() {
       taxNumber: 'TRN-100234567',
       creditLimit: 50000,
       status: 'ACTIVE',
+      warehouseId: warehouseKarachi.id,
       contacts: [
         { fullName: 'Ahmed Al-Rashidi', title: 'Procurement Manager', email: 'ahmed@gulftelcom.ae', phone: '+971 50 111 2233', isPrimary: true },
         { fullName: 'Sara Khalid',       title: 'Finance Director',    email: 'sara@gulftelcom.ae',  phone: '+971 50 222 3344', isPrimary: false },
@@ -309,6 +310,7 @@ async function main() {
       taxNumber: 'TRN-200345678',
       creditLimit: 75000,
       status: 'ACTIVE',
+      warehouseId: warehouseLahore.id,
       contacts: [
         { fullName: 'Khalid Ibrahim',   title: 'CEO',                 email: 'khalid@albarakah.com',  phone: '+971 55 100 2200', isPrimary: true },
         { fullName: 'Nour Al-Mansouri', title: 'Project Coordinator', email: 'nour@albarakah.com',    phone: '+971 55 300 4400', isPrimary: false },
@@ -330,6 +332,7 @@ async function main() {
       country: 'UAE',
       creditLimit: 100000,
       status: 'ACTIVE',
+      warehouseId: warehouseKarachi.id,
       contacts: [
         { fullName: 'Fatima Al-Zaabi', title: 'IT Director', email: 'fatima@emiratesnet.com', phone: '+971 52 500 6600', isPrimary: true },
       ],
@@ -347,6 +350,7 @@ async function main() {
       country: 'UAE',
       creditLimit: 30000,
       status: 'ACTIVE',
+      warehouseId: warehouseLahore.id,
       contacts: [
         { fullName: 'Mohammad Al-Noor', title: 'Facilities Manager', email: 'mohammad@nooredu.ae', phone: '+971 56 100 1100', isPrimary: true },
       ],
@@ -364,6 +368,7 @@ async function main() {
       city: 'Dubai',
       country: 'UAE',
       status: 'PROSPECT',
+      warehouseId: warehouseLahore.id,
       contacts: [
         { fullName: 'Layla Hassan', title: 'Operations Director', email: 'layla@horizonre.ae', phone: '+971 50 700 8800', isPrimary: true },
       ],
@@ -389,7 +394,7 @@ async function main() {
       const txDate = new Date();
       txDate.setDate(txDate.getDate() - daysAgo);
       await prisma.clientTransaction.create({
-        data: { ...txBody, clientId: client.id, date: txDate, createdBy: admin.id },
+        data: { ...txBody, clientId: client.id, warehouseId: clientBody.warehouseId, date: txDate, createdBy: admin.id },
       });
     }
 
@@ -442,6 +447,7 @@ async function main() {
         clientId: client1.id,
         createdBy: salesUser.id,
         status: 'APPROVED',
+        warehouseId: warehouseKarachi.id,
         validUntil: new Date(Date.now() + 30 * 86400000),
         notes: 'Network infrastructure upgrade for main office',
         discountType: 'PERCENTAGE', discountValue: 5, discountAmount: 600,
@@ -464,6 +470,7 @@ async function main() {
         clientId: client2.id,
         createdBy: salesUser.id,
         status: 'SENT',
+        warehouseId: warehouseLahore.id,
         validUntil: new Date(Date.now() + 15 * 86400000),
         notes: 'Structured cabling for new building',
         discountType: 'FIXED', discountValue: 0, discountAmount: 0,
@@ -486,6 +493,7 @@ async function main() {
         clientId: client3.id,
         createdBy: salesUser.id,
         status: 'DRAFT',
+        warehouseId: warehouseKarachi.id,
         validUntil: new Date(Date.now() + 20 * 86400000),
         notes: 'Fiber backbone installation',
         discountType: 'PERCENTAGE', discountValue: 0, discountAmount: 0,
@@ -513,6 +521,7 @@ async function main() {
         quotationId: quot1?.id || null,
         createdBy: salesUser.id,
         status: 'APPROVED',
+        warehouseId: warehouseKarachi.id,
         notes: 'Approved PO for network upgrade',
         taxRate: 0, taxAmount: 0,
         subtotal: 11400, totalAmount: 11400,
@@ -536,6 +545,7 @@ async function main() {
         quotationId: quot2?.id || null,
         createdBy: salesUser.id,
         status: 'PENDING',
+        warehouseId: warehouseLahore.id,
         notes: 'Awaiting approval',
         taxRate: 0, taxAmount: 0,
         subtotal: 7200, totalAmount: 7200,
@@ -563,6 +573,7 @@ async function main() {
         poId: po1?.id || null,
         createdBy: salesUser.id,
         status: 'DELIVERED',
+        warehouseId: warehouseKarachi.id,
         notes: 'Network equipment — delivered and installed',
         taxRate: 0, taxAmount: 0, discountAmount: 0,
         subtotal: 11400, totalAmount: 11400,
@@ -580,6 +591,7 @@ async function main() {
     const invoice = await prisma.clientTransaction.create({
       data: {
         clientId: client1.id, type: 'INVOICE', amount: 11400,
+        warehouseId: warehouseKarachi.id,
         description: `Invoice for Sale ${sale.saleNumber}`,
         reference: sale.saleNumber, date: new Date(Date.now() - 5 * 86400000),
         createdBy: salesUser.id,
@@ -595,6 +607,7 @@ async function main() {
         clientId: client3.id,
         createdBy: salesUser.id,
         status: 'CONFIRMED',
+        warehouseId: warehouseKarachi.id,
         notes: 'Fiber cables — confirmed, awaiting delivery',
         taxRate: 0, taxAmount: 0, discountAmount: 0,
         subtotal: 3600, totalAmount: 3600,
@@ -624,6 +637,7 @@ async function main() {
         address: 'Business Bay, Tower 3, Floor 12',
         city: 'Dubai',
         status: 'ACTIVE',
+        warehouseId: warehouseKarachi.id,
         startDate: new Date(Date.now() - 7 * 86400000),
         estimatedEndDate: new Date(Date.now() + 30 * 86400000),
         notes: 'Full network infrastructure upgrade including switches, patch panels and structured cabling.',
@@ -665,6 +679,7 @@ async function main() {
         location: 'Industrial Area Block 7',
         city: 'Abu Dhabi',
         status: 'PLANNING',
+        warehouseId: warehouseLahore.id,
         startDate: new Date(Date.now() + 7 * 86400000),
         estimatedEndDate: new Date(Date.now() + 60 * 86400000),
         notes: 'CCTV cameras, access control system and security cabling.',
@@ -685,6 +700,7 @@ async function main() {
         type: 'QUOTATION',
         title: 'Approve Quotation QUO-0001',
         description: 'Gulf Telecom network upgrade quotation for PKR 11,400. Please review and approve.',
+        warehouseId: warehouseKarachi.id,
         requestedBy: salesUser.id,
         assignedTo: admin.id,
         priority: 'HIGH',
@@ -702,6 +718,7 @@ async function main() {
         type: 'INVENTORY_ADJUSTMENT',
         title: 'Stock Adjustment – Cable Tray',
         description: 'Requesting emergency stock adjustment for Cable Tray 100mm. Current stock is critically low (1 unit, threshold 20).',
+        warehouseId: warehouseLahore.id,
         requestedBy: techUser.id,
         assignedTo: admin.id,
         priority: 'HIGH',
@@ -716,6 +733,7 @@ async function main() {
         type: 'PURCHASE_ORDER',
         title: 'Approve Purchase Order PO-0002',
         description: 'Al-Barakah structured cabling PO for PKR 7,200. Awaiting management sign-off.',
+        warehouseId: warehouseLahore.id,
         requestedBy: salesUser.id,
         assignedTo: admin.id,
         priority: 'NORMAL',
@@ -738,6 +756,7 @@ async function main() {
         fileName: 'network-diagram-gulf-telecom.pdf',
         mimeType: 'application/pdf',
         fileSize: 245760,
+        warehouseId: warehouseKarachi.id,
         projectId: proj1?.id || null,
         clientId: client1?.id || null,
         uploadedBy: admin.id,
@@ -756,6 +775,7 @@ async function main() {
         fileName: 'quo-0001-signed.pdf',
         mimeType: 'application/pdf',
         fileSize: 128000,
+        warehouseId: warehouseKarachi.id,
         clientId: client1?.id || null,
         uploadedBy: salesUser.id,
         version: 1,
@@ -773,6 +793,7 @@ async function main() {
         fileName: 'site-survey-gulf-telecom.pdf',
         mimeType: 'application/pdf',
         fileSize: 512000,
+        warehouseId: warehouseKarachi.id,
         projectId: proj1?.id || null,
         uploadedBy: techUser.id,
         version: 1,

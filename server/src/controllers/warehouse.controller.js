@@ -1,10 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
-const { PrismaPg } = require('@prisma/adapter-pg');
-const { Pool } = require('pg');
+const prisma = require('../utils/prisma');
 const { logAudit } = require('./audit.controller');
-
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
 // GET /warehouses
 async function getWarehouses(req, res) {
@@ -45,15 +40,12 @@ async function getWarehouseStats(req, res) {
   try {
     const id = parseInt(req.params.id);
 
-    const [productCount, totalValue, lowStock, recentTx] = await Promise.all([
+    const [productCount, totalValue, recentTx] = await Promise.all([
       prisma.product.count({ where: { warehouseId: id, status: 'ACTIVE' } }),
       prisma.product.aggregate({
         where: { warehouseId: id, status: 'ACTIVE' },
         _sum: { quantity: true },
       }),
-      prisma.product.count({
-        where: { warehouseId: id, status: 'ACTIVE', quantity: { lte: prisma.product.fields.minThreshold } },
-      }).catch(() => 0),
       prisma.inventoryTransaction.count({
         where: { warehouseId: id },
       }),

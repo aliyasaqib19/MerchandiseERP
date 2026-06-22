@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard,
   Package,
@@ -34,11 +34,11 @@ import {
   TrendingUp,
   UserCircle,
   Warehouse,
-  Plus,
+  Repeat,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
-import api from '../../lib/api';
+import { useWarehouseStore } from '../../store/warehouseStore';
 
 // Full nav tree — each item can have children.
 // permission gates visibility; a parent is hidden if zero children are visible.
@@ -213,6 +213,9 @@ export function Sidebar({ open, onClose }) {
           </button>
         </div>
 
+        {/* Active warehouse switcher */}
+        <WarehouseSwitcher onLinkClick={onClose} />
+
         {/* User chip */}
         <div className="px-4 py-3 border-b border-slate-700/60 flex-shrink-0">
           <div className="flex items-center gap-2.5 bg-slate-800/60 rounded-lg px-3 py-2">
@@ -255,146 +258,41 @@ export function Sidebar({ open, onClose }) {
               </div>
             );
           })}
-
-          {/* Warehouses section — dynamic */}
-          {hasPermission('INVENTORY_VIEW') && (
-            <WarehousesSection onLinkClick={onClose} />
-          )}
         </nav>
       </aside>
     </>
   );
 }
 
-function WarehousesSection({ onLinkClick }) {
-  const location = useLocation();
+function WarehouseSwitcher({ onLinkClick }) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const activeWarehouse = useWarehouseStore((s) => s.activeWarehouse);
 
-  const { data: warehouses = [] } = useQuery({
-    queryKey: ['warehouses'],
-    queryFn: () => api.get('/warehouses').then((r) => r.data),
-    staleTime: 60_000,
-  });
-
-  return (
-    <div>
-      <p className="px-3 mb-1.5 text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
-        Warehouses
-      </p>
-      <div className="space-y-0.5">
-        {/* All Warehouses link */}
-        <NavLink
-          to="/warehouses"
-          end
-          onClick={onLinkClick}
-          className={({ isActive }) =>
-            cn(
-              'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all',
-              isActive
-                ? 'bg-primary text-white shadow-sm'
-                : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
-            )
-          }
-        >
-          <Warehouse className="w-4 h-4 flex-shrink-0" />
-          <span className="flex-1">All Warehouses</span>
-          <span className="text-[10px] bg-slate-700 text-slate-300 rounded-full px-1.5 py-0.5">
-            {warehouses.length}
-          </span>
-        </NavLink>
-
-        {/* Each warehouse as expandable group */}
-        {warehouses.map((wh) => (
-          <WarehouseNavGroup
-            key={wh.id}
-            warehouse={wh}
-            onLinkClick={onLinkClick}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function WarehouseNavGroup({ warehouse, onLinkClick }) {
-  const location = useLocation();
-  const base = `/warehouses/${warehouse.id}`;
-
-  const isAnyChildActive = location.pathname.startsWith(base);
-  const [expanded, setExpanded] = useState(isAnyChildActive);
-
-  const children = [
-    { label: 'Overview',        icon: PieChart,       tab: 'overview' },
-    { label: 'Products',        icon: Box,            tab: 'products' },
-    { label: 'Stock Movements', icon: ArrowLeftRight, tab: 'movements' },
-  ];
+  function switchWarehouse() {
+    onLinkClick?.();
+    queryClient.clear();
+    navigate('/select-warehouse');
+  }
 
   return (
-    <div>
+    <div className="px-4 py-3 border-b border-slate-700/60 flex-shrink-0">
       <button
-        onClick={() => setExpanded((v) => !v)}
-        className={cn(
-          'flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm transition-all',
-          isAnyChildActive
-            ? 'text-slate-100 bg-slate-800'
-            : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
-        )}
+        onClick={switchWarehouse}
+        className="w-full flex items-center gap-2.5 bg-slate-800/60 hover:bg-slate-800 rounded-lg px-3 py-2 transition-colors group"
+        title="Switch warehouse"
       >
-        <Warehouse className="w-4 h-4 flex-shrink-0 text-primary/80" />
-        <span className="flex-1 text-left truncate">{warehouse.name}</span>
-        <ChevronDown
-          className={cn('w-3.5 h-3.5 flex-shrink-0 transition-transform', expanded && 'rotate-180')}
-        />
-      </button>
-
-      {expanded && (
-        <div className="mt-0.5 ml-3 pl-3 border-l border-slate-700/60 space-y-0.5">
-          {/* Full detail page */}
-          <NavLink
-            to={base}
-            end
-            onClick={onLinkClick}
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-2 px-3 py-1.5 rounded-md text-xs transition-all',
-                isActive
-                  ? 'text-primary font-semibold'
-                  : 'text-slate-500 hover:text-slate-200 hover:bg-slate-800/60'
-              )
-            }
-          >
-            <BarChart2 className="w-3.5 h-3.5 flex-shrink-0" />
-            Overview
-          </NavLink>
-
-          <NavLink
-            to={`${base}?tab=products`}
-            onClick={onLinkClick}
-            className={cn(
-              'flex items-center gap-2 px-3 py-1.5 rounded-md text-xs transition-all',
-              location.search === '?tab=products' && location.pathname === base
-                ? 'text-primary font-semibold'
-                : 'text-slate-500 hover:text-slate-200 hover:bg-slate-800/60'
-            )}
-          >
-            <Box className="w-3.5 h-3.5 flex-shrink-0" />
-            Products
-          </NavLink>
-
-          <NavLink
-            to={`${base}?tab=movements`}
-            onClick={onLinkClick}
-            className={cn(
-              'flex items-center gap-2 px-3 py-1.5 rounded-md text-xs transition-all',
-              location.search === '?tab=movements' && location.pathname === base
-                ? 'text-primary font-semibold'
-                : 'text-slate-500 hover:text-slate-200 hover:bg-slate-800/60'
-            )}
-          >
-            <ArrowLeftRight className="w-3.5 h-3.5 flex-shrink-0" />
-            Stock Movements
-          </NavLink>
+        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+          <Warehouse className="w-4 h-4 text-primary" />
         </div>
-      )}
+        <div className="overflow-hidden text-left flex-1">
+          <p className="text-[10px] text-slate-400 uppercase tracking-wider leading-tight">Warehouse</p>
+          <p className="text-sm font-semibold truncate leading-tight">
+            {activeWarehouse?.name || 'Select warehouse'}
+          </p>
+        </div>
+        <Repeat className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-100 flex-shrink-0" />
+      </button>
     </div>
   );
 }

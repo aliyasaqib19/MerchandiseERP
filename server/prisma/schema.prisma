@@ -125,8 +125,16 @@ model Warehouse {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  products     Product[]
-  transactions InventoryTransaction[]
+  products           Product[]
+  transactions       InventoryTransaction[]
+  clients            Client[]
+  quotations         Quotation[]
+  purchaseOrders     PurchaseOrder[]
+  sales              Sale[]
+  projects           Project[]
+  documents          Document[]
+  approvalRequests   ApprovalRequest[]
+  clientTransactions ClientTransaction[]
 
   @@map("warehouses")
 }
@@ -207,10 +215,12 @@ model Client {
   creditLimit Float?
   status      ClientStatus @default(ACTIVE)
   notes       String?
+  warehouseId Int?
   createdBy   Int
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
+  warehouse      Warehouse?         @relation(fields: [warehouseId], references: [id])
   createdByUser  User               @relation(fields: [createdBy], references: [id])
   contacts       Contact[]
   clientNotes    ClientNote[]
@@ -263,12 +273,14 @@ model ClientTransaction {
   paymentMethod String?
   date          DateTime              @default(now())
   dueDate       DateTime?
+  warehouseId   Int?
   createdBy     Int
   createdAt     DateTime              @default(now())
 
-  client Client @relation(fields: [clientId], references: [id])
-  user   User   @relation(fields: [createdBy], references: [id])
-  sale   Sale?  @relation("SaleInvoice")
+  client    Client     @relation(fields: [clientId], references: [id])
+  warehouse Warehouse? @relation(fields: [warehouseId], references: [id])
+  user      User       @relation(fields: [createdBy], references: [id])
+  sale      Sale?      @relation("SaleInvoice")
 
   @@map("client_transactions")
 }
@@ -291,10 +303,12 @@ model Quotation {
   taxRate         Float           @default(0)
   taxAmount       Float           @default(0)
   totalAmount     Float           @default(0)
+  warehouseId     Int?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
   client         Client          @relation(fields: [clientId], references: [id])
+  warehouse      Warehouse?      @relation(fields: [warehouseId], references: [id])
   createdByUser  User            @relation("QuotationCreator", fields: [createdBy], references: [id])
   items          QuotationItem[]
   purchaseOrders PurchaseOrder[]
@@ -333,12 +347,14 @@ model PurchaseOrder {
   totalAmount      Float    @default(0)
   poDate           DateTime @default(now())
   expectedDelivery DateTime?
+  warehouseId      Int?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  client        Client    @relation(fields: [clientId], references: [id])
+  client        Client     @relation(fields: [clientId], references: [id])
+  warehouse     Warehouse? @relation(fields: [warehouseId], references: [id])
   quotation     Quotation? @relation(fields: [quotationId], references: [id])
-  createdByUser User      @relation("POCreator", fields: [createdBy], references: [id])
+  createdByUser User       @relation("POCreator", fields: [createdBy], references: [id])
   items         POItem[]
   sales         Sale[]
 
@@ -376,10 +392,12 @@ model Sale {
   totalAmount    Float      @default(0)
   saleDate       DateTime   @default(now())
   invoiceId      Int?       @unique
+  warehouseId    Int?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
   client        Client             @relation(fields: [clientId], references: [id])
+  warehouse     Warehouse?         @relation(fields: [warehouseId], references: [id])
   quotation     Quotation?         @relation(fields: [quotationId], references: [id])
   purchaseOrder PurchaseOrder?     @relation(fields: [poId], references: [id])
   createdByUser User               @relation("SaleCreator", fields: [createdBy], references: [id])
@@ -522,11 +540,13 @@ model Project {
   estimatedEndDate DateTime?
   completedAt      DateTime?
   notes            String?
+  warehouseId      Int?
   createdBy        Int
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
   client          Client              @relation(fields: [clientId], references: [id])
+  warehouse       Warehouse?          @relation(fields: [warehouseId], references: [id])
   sale            Sale?               @relation(fields: [saleId], references: [id])
   manager         User                @relation("ProjectManager", fields: [managerId], references: [id])
   createdByUser   User                @relation("ProjectCreator", fields: [createdBy], references: [id])
@@ -711,9 +731,11 @@ model ApprovalRequest {
   decisionNote String?
   priority     ApprovalPriority @default(NORMAL)
   dueDate      DateTime?
+  warehouseId  Int?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
+  warehouse    Warehouse?     @relation(fields: [warehouseId], references: [id])
   requester    User           @relation("ApprovalRequester", fields: [requestedBy], references: [id])
   assignee     User?          @relation("ApprovalAssignee", fields: [assignedTo], references: [id])
   decider      User?          @relation("ApprovalDecider", fields: [decidedBy], references: [id])
@@ -736,11 +758,13 @@ model Document {
   status      DocumentStatus @default(ACTIVE)
   projectId   Int?
   clientId    Int?
+  warehouseId Int?
   uploadedBy  Int
   tags        String?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
+  warehouse   Warehouse?     @relation(fields: [warehouseId], references: [id])
   uploader    User           @relation("DocumentUploader", fields: [uploadedBy], references: [id])
   versions    DocumentVersion[]
 

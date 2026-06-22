@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
+import { useWarehouseStore } from '../store/warehouseStore';
 
 const api = axios.create({
   baseURL: '/api',
@@ -10,6 +11,11 @@ api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().accessToken;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  // Scope every request to the active warehouse workspace
+  const activeWarehouse = useWarehouseStore.getState().activeWarehouse;
+  if (activeWarehouse?.id) {
+    config.headers['x-warehouse-id'] = activeWarehouse.id;
   }
   return config;
 });
