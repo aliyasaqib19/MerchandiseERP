@@ -837,6 +837,102 @@ async function main() {
     });
   }
 
+  // ── Shipments (inter-warehouse transfers) ─────────────────────────────────────
+  console.log('Seeding shipments...');
+
+  const skuMap = {};
+  for (const sku of ['CAB-UTP-CAT6-305', 'NET-SW-24P-GIG', 'NET-PATCH-PAN-24', 'CON-PVC-20MM-3M']) {
+    skuMap[sku] = await prisma.product.findFirst({ where: { sku } });
+  }
+
+  async function seedShipment({ number, sourceId, destId, status, notes, items, decided, received }) {
+    if (await prisma.shipment.findFirst({ where: { shipmentNumber: number } })) return;
+    await prisma.shipment.create({
+      data: {
+        shipmentNumber: number,
+        sourceWarehouseId: sourceId,
+        destWarehouseId: destId,
+        status,
+        notes: notes || null,
+        createdBy: salesUser.id,
+        approvedBy: decided ? admin.id : null,
+        approvedAt: decided ? new Date(Date.now() - 2 * 86400000) : null,
+        decisionNote: decided ? 'Approved for transfer.' : null,
+        receivedBy: received ? admin.id : null,
+        receivedAt: received ? new Date(Date.now() - 1 * 86400000) : null,
+        items: {
+          create: items
+            .filter((it) => it.product)
+            .map((it) => ({
+              productId: it.product.id,
+              sku: it.product.sku,
+              description: it.product.name,
+              quantity: it.quantity,
+            })),
+        },
+      },
+    });
+  }
+
+  const year2 = new Date().getFullYear();
+
+  // 1) Draft at Karachi, ready to submit for approval
+  await seedShipment({
+    number: `SHP-${year2}-0001`,
+    sourceId: warehouseKarachi.id, destId: warehouseLahore.id,
+    status: 'IN_PROCESS',
+    notes: 'Cat6 cable restock for Lahore site work',
+    items: [{ product: skuMap['CAB-UTP-CAT6-305'], quantity: 5 }],
+  });
+
+  // 2) Pending boss approval (Karachi → Lahore)
+  await seedShipment({
+    number: `SHP-${year2}-0002`,
+    sourceId: warehouseKarachi.id, destId: warehouseLahore.id,
+    status: 'PENDING_APPROVAL',
+    notes: 'Two managed switches requested by Lahore branch',
+    items: [{ product: skuMap['NET-SW-24P-GIG'], quantity: 2 }],
+  });
+  // Notify boss for the pending one
+  if (!await prisma.notification.findFirst({ where: { title: `Shipment SHP-${year2}-0002 needs approval` } })) {
+    await prisma.notification.create({
+      data: {
+        userId: admin.id, type: 'APPROVAL_REQUIRED',
+        title: `Shipment SHP-${year2}-0002 needs approval`,
+        message: 'Karachi Warehouse → Lahore Warehouse. Review and approve the transfer.',
+        link: '/inventory/shipments',
+      },
+    });
+  }
+
+  // 3) Approved, waiting for Lahore to accept the delivery (incoming to Lahore)
+  await seedShipment({
+    number: `SHP-${year2}-0003`,
+    sourceId: warehouseKarachi.id, destId: warehouseLahore.id,
+    status: 'APPROVED', decided: true,
+    notes: 'Cat6 cable — approved, awaiting receipt at Lahore',
+    items: [{ product: skuMap['CAB-UTP-CAT6-305'], quantity: 3 }],
+  });
+  if (!await prisma.notification.findFirst({ where: { title: `Shipment SHP-${year2}-0003 approved` } })) {
+    await prisma.notification.create({
+      data: {
+        userId: admin.id, type: 'APPROVAL_DECIDED',
+        title: `Shipment SHP-${year2}-0003 approved`,
+        message: 'Approved for Lahore Warehouse. Switch to Lahore Warehouse to accept the delivery.',
+        link: '/inventory/shipments',
+      },
+    });
+  }
+
+  // 4) Completed transfer (Lahore → Karachi), already received — history
+  await seedShipment({
+    number: `SHP-${year2}-0004`,
+    sourceId: warehouseLahore.id, destId: warehouseKarachi.id,
+    status: 'RECEIVED', decided: true, received: true,
+    notes: 'PVC conduit transfer completed',
+    items: [{ product: skuMap['CON-PVC-20MM-3M'], quantity: 20 }],
+  });
+
   console.log('Seed complete.');
 }
 
