@@ -4,6 +4,11 @@ function authorize(...requiredPermissions) {
       return res.status(401).json({ message: 'Unauthenticated' });
     }
 
+    // System Administrator bypasses all permission checks.
+    if (req.user.roleName === 'System Administrator') {
+      return next();
+    }
+
     const userPerms = new Set(req.user.permissions);
     const hasAll = requiredPermissions.every((p) => userPerms.has(p));
 
