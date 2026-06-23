@@ -21,7 +21,7 @@ const STATUS_VARIANT = { ACTIVE: 'success', INACTIVE: 'secondary', DISCONTINUED:
 export default function ProductListPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
+  const [brandFilter, setBrandFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('ACTIVE');
   const [lowStockOnly, setLowStockOnly] = useState(false);
 
@@ -30,20 +30,20 @@ export default function ProductListPage() {
   const [stockAction, setStockAction] = useState(null); // { product, type: 'in'|'out' }
 
   const { data: products = [], isLoading } = useQuery({
-    queryKey: ['inventory-products', { search, categoryFilter, statusFilter, lowStockOnly }],
+    queryKey: ['inventory-products', { search, brandFilter, statusFilter, lowStockOnly }],
     queryFn: () => {
       const params = new URLSearchParams();
       if (search) params.set('search', search);
-      if (categoryFilter) params.set('categoryId', categoryFilter);
+      if (brandFilter) params.set('brandId', brandFilter);
       if (statusFilter) params.set('status', statusFilter);
       if (lowStockOnly) params.set('lowStock', 'true');
       return api.get(`/inventory/products?${params}`).then((r) => r.data);
     },
   });
 
-  const { data: categories = [] } = useQuery({
-    queryKey: ['inventory-categories'],
-    queryFn: () => api.get('/inventory/categories').then((r) => r.data),
+  const { data: brands = [] } = useQuery({
+    queryKey: ['brands'],
+    queryFn: () => api.get('/brands').then((r) => r.data),
   });
 
   const deleteProduct = useMutation({
@@ -81,14 +81,14 @@ export default function ProductListPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             className="pl-9"
-            placeholder="Search by name or SKU..."
+            placeholder="Search by name or manufacture no..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="w-44">
-          <option value="">All Categories</option>
-          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        <Select value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)} className="w-44">
+          <option value="">All Brands</option>
+          {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </Select>
         <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-36">
           <option value="">All Status</option>
@@ -116,9 +116,9 @@ export default function ProductListPage() {
           <table className="w-full text-sm">
             <thead className="bg-muted/40">
               <tr>
-                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">SKU</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Manufacture No.</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Product</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Category</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Brand</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Stock</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">Cost</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">Price</th>
@@ -152,7 +152,9 @@ export default function ProductListPage() {
                     </td>
                     <td className="px-4 py-3 font-medium">{product.name}</td>
                     <td className="px-4 py-3">
-                      <Badge variant="outline" className="text-xs">{product.category?.name}</Badge>
+                      {product.brand?.name
+                        ? <Badge variant="outline" className="text-xs">{product.brand.name}</Badge>
+                        : <span className="text-xs text-muted-foreground">—</span>}
                     </td>
                     <td className="px-4 py-3">
                       <StockBadge
@@ -163,10 +165,10 @@ export default function ProductListPage() {
                       />
                     </td>
                     <td className="px-4 py-3 text-right text-muted-foreground">
-                      {product.costPrice ? `$${product.costPrice.toFixed(2)}` : '—'}
+                      {product.costPrice ? `Rs. ${product.costPrice.toFixed(2)}` : '—'}
                     </td>
                     <td className="px-4 py-3 text-right font-medium">
-                      {product.sellingPrice ? `$${product.sellingPrice.toFixed(2)}` : '—'}
+                      {product.sellingPrice ? `Rs. ${product.sellingPrice.toFixed(2)}` : '—'}
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={STATUS_VARIANT[product.status]} className="text-xs">

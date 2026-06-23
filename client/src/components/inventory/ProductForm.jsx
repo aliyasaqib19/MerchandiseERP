@@ -10,10 +10,11 @@ import { Select } from '../ui/select';
 import api from '../../lib/api';
 
 const schema = z.object({
-  sku: z.string().min(2, 'SKU is required').toUpperCase(),
+  sku: z.string().min(2, 'Manufacture number is required').toUpperCase(),
   name: z.string().min(2, 'Product name is required'),
   description: z.string().optional(),
   categoryId: z.string().min(1, 'Category is required'),
+  brandId: z.string().optional(),
   unitType: z.enum(['PIECE', 'METER', 'KG', 'LITER', 'BOX', 'ROLL', 'SET']),
   quantity: z.coerce.number().min(0, 'Cannot be negative').optional(),
   minThreshold: z.coerce.number().min(0, 'Cannot be negative').optional(),
@@ -37,6 +38,11 @@ export default function ProductForm({ onSuccess, defaultValues, productId }) {
     queryFn: () => api.get('/inventory/categories').then((r) => r.data),
   });
 
+  const { data: brands = [] } = useQuery({
+    queryKey: ['brands'],
+    queryFn: () => api.get('/brands').then((r) => r.data),
+  });
+
   const {
     register,
     handleSubmit,
@@ -49,6 +55,7 @@ export default function ProductForm({ onSuccess, defaultValues, productId }) {
       name: defaultValues?.name || '',
       description: defaultValues?.description || '',
       categoryId: String(defaultValues?.category?.id || defaultValues?.categoryId || ''),
+      brandId: String(defaultValues?.brand?.id || defaultValues?.brandId || ''),
       unitType: defaultValues?.unitType || 'PIECE',
       quantity: defaultValues?.quantity ?? 0,
       minThreshold: defaultValues?.minThreshold ?? 0,
@@ -62,6 +69,7 @@ export default function ProductForm({ onSuccess, defaultValues, productId }) {
     try {
       const payload = {
         ...values,
+        brandId: values.brandId ? Number(values.brandId) : null,
         costPrice: values.costPrice === '' ? null : Number(values.costPrice),
         sellingPrice: values.sellingPrice === '' ? null : Number(values.sellingPrice),
       };
@@ -89,10 +97,10 @@ export default function ProductForm({ onSuccess, defaultValues, productId }) {
       )}
 
       <div className="grid grid-cols-2 gap-4">
-        {/* SKU */}
+        {/* Manufacture No. */}
         <div className="space-y-1.5">
-          <Label>SKU Code</Label>
-          <Input placeholder="e.g. CAB-UTP-CAT6" className="uppercase" {...register('sku')} disabled={isEdit} />
+          <Label>Manufacture No.</Label>
+          <Input placeholder="e.g. ED-100" className="uppercase" {...register('sku')} disabled={isEdit} />
           {errors.sku && <p className="text-xs text-destructive">{errors.sku.message}</p>}
         </div>
 
@@ -121,6 +129,17 @@ export default function ProductForm({ onSuccess, defaultValues, productId }) {
             placeholder="Product description..."
             {...register('description')}
           />
+        </div>
+
+        {/* Brand */}
+        <div className="space-y-1.5">
+          <Label>Brand <span className="text-muted-foreground text-xs">(optional)</span></Label>
+          <Select {...register('brandId')}>
+            <option value="">No brand</option>
+            {brands.map((b) => (
+              <option key={b.id} value={String(b.id)}>{b.name}</option>
+            ))}
+          </Select>
         </div>
 
         {/* Category */}

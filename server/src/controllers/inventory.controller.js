@@ -100,11 +100,12 @@ async function deleteCategory(req, res) {
 // ─── Products ─────────────────────────────────────────────────────────────────
 
 async function getProducts(req, res) {
-  const { search, categoryId, status, lowStock } = req.query;
+  const { search, categoryId, brandId, status, lowStock } = req.query;
 
   const where = {};
   if (status) where.status = status;
   if (categoryId) where.categoryId = Number(categoryId);
+  if (brandId) where.brandId = Number(brandId);
   if (search) {
     where.OR = [
       { name: { contains: search, mode: 'insensitive' } },
@@ -115,7 +116,10 @@ async function getProducts(req, res) {
 
   const products = await prisma.product.findMany({
     where,
-    include: { category: { select: { id: true, name: true } } },
+    include: {
+      category: { select: { id: true, name: true } },
+      brand: { select: { id: true, name: true } },
+    },
     orderBy: { createdAt: 'desc' },
   });
 
@@ -144,7 +148,7 @@ async function getProduct(req, res) {
 }
 
 async function createProduct(req, res) {
-  const { sku, name, description, categoryId, unitType, quantity, minThreshold, costPrice, sellingPrice, status } = req.body;
+  const { sku, name, description, categoryId, brandId, unitType, quantity, minThreshold, costPrice, sellingPrice, status } = req.body;
 
   const exists = await prisma.product.findUnique({ where: { sku } });
   if (exists) return res.status(409).json({ message: 'SKU already exists' });
@@ -158,6 +162,7 @@ async function createProduct(req, res) {
         name,
         description,
         categoryId: Number(categoryId),
+        brandId: brandId ? Number(brandId) : null,
         unitType: unitType || 'PIECE',
         quantity: initialQty,
         minThreshold: Number(minThreshold) || 0,
@@ -165,7 +170,7 @@ async function createProduct(req, res) {
         sellingPrice: sellingPrice ? Number(sellingPrice) : null,
         status: status || 'ACTIVE',
       },
-      include: { category: { select: { id: true, name: true } } },
+      include: { category: { select: { id: true, name: true } }, brand: { select: { id: true, name: true } } },
     });
 
     // Record initial stock-in if starting quantity > 0
@@ -190,7 +195,7 @@ async function createProduct(req, res) {
 }
 
 async function updateProduct(req, res) {
-  const { name, description, categoryId, unitType, minThreshold, costPrice, sellingPrice, status } = req.body;
+  const { name, description, categoryId, brandId, unitType, minThreshold, costPrice, sellingPrice, status } = req.body;
 
   const product = await prisma.product.update({
     where: { id: Number(req.params.id) },
@@ -198,13 +203,14 @@ async function updateProduct(req, res) {
       name,
       description,
       categoryId: categoryId ? Number(categoryId) : undefined,
+      brandId: brandId !== undefined ? (brandId ? Number(brandId) : null) : undefined,
       unitType,
       minThreshold: minThreshold !== undefined ? Number(minThreshold) : undefined,
       costPrice: costPrice !== undefined ? (costPrice ? Number(costPrice) : null) : undefined,
       sellingPrice: sellingPrice !== undefined ? (sellingPrice ? Number(sellingPrice) : null) : undefined,
       status,
     },
-    include: { category: { select: { id: true, name: true } } },
+    include: { category: { select: { id: true, name: true } }, brand: { select: { id: true, name: true } } },
   });
 
   logAudit({ userId: req.user.id, action: 'UPDATE', module: 'INVENTORY', resourceId: product.id, resourceType: 'Product', newValues: { name, status }, req });

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Shield, Search, Loader2, Filter, RefreshCw,
@@ -39,6 +40,40 @@ function fmt(d) {
     month: 'short', day: 'numeric', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
+}
+
+// Map an audit resource to its detail page
+const RESOURCE_LINK = {
+  Product:         (id) => `/inventory/products/${id}`,
+  Brand:           (id) => `/inventory/brands/${id}`,
+  Shipment:        ()   => `/inventory/shipments`,
+  Client:          (id) => `/clients/${id}`,
+  Sale:            ()   => `/sales/orders`,
+  Quotation:       ()   => `/sales/quotations`,
+  PurchaseOrder:   ()   => `/sales/purchase-orders`,
+  Project:         (id) => `/projects/${id}`,
+  Document:        ()   => `/documents`,
+  ApprovalRequest: ()   => `/approvals`,
+  User:            ()   => `/users`,
+  Role:            ()   => `/roles`,
+};
+
+function ResourceCell({ log }) {
+  if (!log.resourceType) return <span className="text-muted-foreground">—</span>;
+  const label = log.resourceName || `${log.resourceType} #${log.resourceId}`;
+  const linkFn = RESOURCE_LINK[log.resourceType];
+  const href = linkFn && log.resourceId ? linkFn(log.resourceId) : null;
+
+  return (
+    <div className="flex flex-col">
+      {href ? (
+        <Link to={href} className="text-primary hover:underline font-medium">{label}</Link>
+      ) : (
+        <span className="font-medium">{label}</span>
+      )}
+      <span className="text-[10px] text-muted-foreground">{log.resourceType}{log.resourceId ? ` #${log.resourceId}` : ''}</span>
+    </div>
+  );
 }
 
 export default function AuditPage() {
@@ -144,7 +179,6 @@ export default function AuditPage() {
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Module</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Action</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Resource</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">IP</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -165,11 +199,9 @@ export default function AuditPage() {
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cls}`}>{log.module}</span>
                       </td>
                       <td className="px-4 py-2.5 font-mono text-xs">{log.action}</td>
-                      <td className="px-4 py-2.5 text-muted-foreground text-xs">
-                        {log.resourceType && <span>{log.resourceType}</span>}
-                        {log.resourceId && <span className="ml-1 text-primary">#{log.resourceId}</span>}
+                      <td className="px-4 py-2.5 text-xs">
+                        <ResourceCell log={log} />
                       </td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground font-mono">{log.ipAddress || '—'}</td>
                     </tr>
                   );
                 })}

@@ -29,8 +29,61 @@ async function listAuditLogs(req, res, next) {
         take: Number(limit),
       }),
     ]);
-    res.json({ total, page: Number(page), limit: Number(limit), items });
+
+    const enriched = await attachResourceNames(items);
+    res.json({ total, page: Number(page), limit: Number(limit), items: enriched });
   } catch (err) { next(err); }
+}
+
+// Resolve a human-readable name for each audit log's changed resource
+const RESOURCE_CONFIG = {
+  Product:         { model: 'product',         field: 'name' },
+  Brand:           { model: 'brand',           field: 'name' },
+  Category:        { model: 'category',        field: 'name' },
+  Warehouse:       { model: 'warehouse',       field: 'name' },
+  Client:          { model: 'client',          field: 'companyName' },
+  Quotation:       { model: 'quotation',       field: 'quotationNumber' },
+  Sale:            { model: 'sale',            field: 'saleNumber' },
+  PurchaseOrder:   { model: 'purchaseOrder',   field: 'poNumber' },
+  Project:         { model: 'project',         field: 'title' },
+  Shipment:        { model: 'shipment',        field: 'shipmentNumber' },
+  Document:        { model: 'document',        field: 'title' },
+  ApprovalRequest: { model: 'approvalRequest', field: 'title' },
+  User:            { model: 'user',            field: 'fullName' },
+  Role:            { model: 'role',            field: 'name' },
+};
+
+async function attachResourceNames(items) {
+  const byType = {};
+  for (const it of items) {
+    const cfg = RESOURCE_CONFIG[it.resourceType];
+    if (!cfg || !it.resourceId) continue;
+    const id = Number(it.resourceId);
+    if (Number.isNaN(id)) continue;
+    (byType[it.resourceType] ||= new Set()).add(id);
+  }
+
+  const nameMaps = {};
+  for (const [type, idSet] of Object.entries(byType)) {
+    const cfg = RESOURCE_CONFIG[type];
+    try {
+      const rows = await prisma[cfg.model].findMany({
+        where: { id: { in: [...idSet] } },
+        select: { id: true, [cfg.field]: true },
+      });
+      nameMaps[type] = Object.fromEntries(rows.map((r) => [r.id, r[cfg.field]]));
+    } catch (_) {
+      nameMaps[type] = {};
+    }
+  }
+
+  return items.map((it) => ({
+    ...it,
+    resourceName:
+      it.resourceType && it.resourceId
+        ? nameMaps[it.resourceType]?.[Number(it.resourceId)] || null
+        : null,
+  }));
 }
 
 async function getAuditStats(req, res, next) {
