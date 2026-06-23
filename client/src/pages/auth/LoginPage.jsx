@@ -10,6 +10,7 @@ import { Label } from '../../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import api from '../../lib/api';
 import { useAuthStore } from '../../store/authStore';
+import { useWarehouseStore } from '../../store/warehouseStore';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -20,6 +21,7 @@ const schema = z.object({
 export default function LoginPage() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
+  const clearActiveWarehouse = useWarehouseStore((s) => s.clearActiveWarehouse);
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState('');
 
@@ -37,7 +39,8 @@ export default function LoginPage() {
         password: values.password,
       });
       setAuth(data.user, data.accessToken, data.refreshToken);
-      navigate('/dashboard', { replace: true });
+      clearActiveWarehouse(); // always pick a warehouse after logging in
+      navigate('/select-warehouse', { replace: true });
     } catch (err) {
       setServerError(err.response?.data?.message || 'Login failed. Please try again.');
     }
