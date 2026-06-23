@@ -811,6 +811,9 @@ model DocumentVersion {
 model Shipment {
   id                Int            @id @default(autoincrement())
   shipmentNumber    String         @unique
+  consignmentNumber String?
+  challanUrl        String?
+  challanName       String?
   sourceWarehouseId Int
   destWarehouseId   Int
   status            ShipmentStatus @default(IN_PROCESS)

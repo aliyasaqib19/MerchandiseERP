@@ -80,12 +80,14 @@ async function createShipment(req, res) {
   const sourceWarehouseId = req.warehouseId;
   if (!sourceWarehouseId) return res.status(400).json({ message: 'Select a warehouse first.' });
 
-  const { destWarehouseId, items, notes } = req.body;
+  const { destWarehouseId, items, notes, consignmentNumber, challanUrl, challanName } = req.body || {};
   const destId = Number(destWarehouseId);
 
   if (!destId) return res.status(400).json({ message: 'Destination warehouse is required.' });
   if (destId === sourceWarehouseId) return res.status(400).json({ message: 'Source and destination must differ.' });
   if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ message: 'Add at least one item.' });
+  if (!consignmentNumber || !consignmentNumber.trim()) return res.status(400).json({ message: 'Consignment number is required.' });
+  if (!challanUrl) return res.status(400).json({ message: 'Delivery challan is required. Please upload the challan to create the shipment.' });
 
   const dest = await prisma.warehouse.findUnique({ where: { id: destId } });
   if (!dest) return res.status(404).json({ message: 'Destination warehouse not found.' });
@@ -108,6 +110,9 @@ async function createShipment(req, res) {
   const shipment = await prisma.shipment.create({
     data: {
       shipmentNumber,
+      consignmentNumber: consignmentNumber.trim(),
+      challanUrl,
+      challanName: challanName || 'delivery-challan',
       sourceWarehouseId,
       destWarehouseId: destId,
       status: 'IN_PROCESS',
@@ -151,7 +156,7 @@ async function submitShipment(req, res) {
 
 async function approveShipment(req, res) {
   const id = Number(req.params.id);
-  const { note } = req.body;
+  const { note } = req.body || {};
   const shipment = await prisma.shipment.findUnique({
     where: { id },
     include: { sourceWarehouse: true, destWarehouse: true },
@@ -180,7 +185,7 @@ async function approveShipment(req, res) {
 
 async function rejectShipment(req, res) {
   const id = Number(req.params.id);
-  const { note } = req.body;
+  const { note } = req.body || {};
   const shipment = await prisma.shipment.findUnique({ where: { id }, include: { destWarehouse: true } });
   if (!shipment) return res.status(404).json({ message: 'Shipment not found' });
   if (shipment.status !== 'PENDING_APPROVAL') return res.status(400).json({ message: 'Shipment is not pending approval.' });
@@ -292,7 +297,7 @@ async function receiveShipment(req, res) {
 
 async function declineShipment(req, res) {
   const id = Number(req.params.id);
-  const { note } = req.body;
+  const { note } = req.body || {};
   const shipment = await prisma.shipment.findUnique({ where: { id }, include: { sourceWarehouse: true, destWarehouse: true } });
   if (!shipment) return res.status(404).json({ message: 'Shipment not found' });
   if (shipment.status !== 'APPROVED') return res.status(400).json({ message: 'Only approved shipments can be declined.' });

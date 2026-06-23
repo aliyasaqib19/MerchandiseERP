@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Truck, Plus, ArrowRight, ArrowUpRight, ArrowDownLeft, Trash2, Loader2,
-  Check, X, Send, ClipboardCheck, Package,
+  Check, X, Send, ClipboardCheck, Package, Upload, FileText,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -29,8 +29,11 @@ function CreateShipmentModal({ onClose }) {
   const queryClient = useQueryClient();
   const activeWarehouse = useWarehouseStore((s) => s.activeWarehouse);
   const [destWarehouseId, setDestWarehouseId] = useState('');
+  const [consignmentNumber, setConsignmentNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [rows, setRows] = useState([{ productId: '', quantity: '' }]);
+  const [challan, setChallan] = useState(null); // { url, name }
+  const [challanError, setChallanError] = useState('');
 
   const { data: warehouses = [] } = useQuery({
     queryKey: ['warehouses'],
@@ -58,13 +61,31 @@ function CreateShipmentModal({ onClose }) {
   function addRow() { setRows((rs) => [...rs, { productId: '', quantity: '' }]); }
   function removeRow(i) { setRows((rs) => rs.filter((_, idx) => idx !== i)); }
 
+  function onChallanChange(e) {
+    const file = e.target.files?.[0];
+    setChallanError('');
+    if (!file) { setChallan(null); return; }
+    if (file.size > 10 * 1024 * 1024) { setChallanError('File must be under 10 MB.'); return; }
+    const reader = new FileReader();
+    reader.onload = () => setChallan({ url: reader.result, name: file.name });
+    reader.readAsDataURL(file);
+  }
+
   function submit(e) {
     e.preventDefault();
     const items = rows
       .filter((r) => r.productId && Number(r.quantity) > 0)
       .map((r) => ({ productId: Number(r.productId), quantity: Number(r.quantity) }));
     if (!destWarehouseId || items.length === 0) return;
-    createMutation.mutate({ destWarehouseId: Number(destWarehouseId), items, notes });
+    if (!consignmentNumber.trim()) return;
+    if (!challan) { setChallanError('Delivery challan is required.'); return; }
+    createMutation.mutate({
+      destWarehouseId: Number(destWarehouseId),
+      consignmentNumber: consignmentNumber.trim(),
+      challanUrl: challan.url,
+      challanName: challan.name,
+      items, notes,
+    });
   }
 
   return (
@@ -84,6 +105,31 @@ function CreateShipmentModal({ onClose }) {
                 {destOptions.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
               </Select>
             </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium mb-1 block">Consignment Number *</label>
+            <Input
+              value={consignmentNumber}
+              onChange={(e) => setConsignmentNumber(e.target.value)}
+              required
+              placeholder="e.g. CN-2026-0001"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium mb-1 block">Delivery Challan * <span className="text-muted-foreground text-xs">(required to create shipment)</span></label>
+            <label className="flex items-center gap-2 border border-dashed rounded-lg px-3 py-3 cursor-pointer hover:bg-muted/40 transition-colors">
+              <Upload className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">
+                {challan ? challan.name : 'Click to upload challan (PDF or image, max 10 MB)'}
+              </span>
+              <input type="file" accept="image/*,application/pdf" className="hidden" onChange={onChallanChange} />
+            </label>
+            {challan && (
+              <p className="text-xs text-green-600 mt-1 flex items-center gap-1"><FileText className="w-3 h-3" /> {challan.name} attached</p>
+            )}
+            {challanError && <p className="text-xs text-red-600 mt-1">{challanError}</p>}
           </div>
 
           <div>
@@ -223,8 +269,10 @@ export default function ShipmentsPage() {
           <thead className="bg-muted/40">
             <tr>
               <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Shipment #</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Consignment #</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Direction</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Route</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Challan</th>
               <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">Items</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Status</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Date</th>
@@ -234,11 +282,11 @@ export default function ShipmentsPage() {
           <tbody className="divide-y">
             {isLoading ? (
               [...Array(4)].map((_, i) => (
-                <tr key={i}>{[...Array(7)].map((_, j) => <td key={j} className="px-4 py-3"><div className="h-4 bg-muted animate-pulse rounded" /></td>)}</tr>
+                <tr key={i}>{[...Array(9)].map((_, j) => <td key={j} className="px-4 py-3"><div className="h-4 bg-muted animate-pulse rounded" /></td>)}</tr>
               ))
             ) : shipments.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center py-12 text-muted-foreground">
+                <td colSpan={9} className="text-center py-12 text-muted-foreground">
                   <Package className="w-10 h-10 mx-auto mb-2 opacity-50" />
                   No shipments yet. Create one to transfer stock to another warehouse.
                 </td>
@@ -249,6 +297,7 @@ export default function ShipmentsPage() {
                 return (
                   <tr key={s.id} className="hover:bg-muted/20">
                     <td className="px-4 py-3 font-mono text-xs font-medium">{s.shipmentNumber}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{s.consignmentNumber || '—'}</td>
                     <td className="px-4 py-3">
                       {s.direction === 'OUTGOING' ? (
                         <span className="inline-flex items-center gap-1 text-xs text-orange-600"><ArrowUpRight className="w-3.5 h-3.5" /> Outgoing</span>
@@ -262,6 +311,14 @@ export default function ShipmentsPage() {
                         <ArrowRight className="w-3 h-3 text-muted-foreground" />
                         {s.destWarehouse?.name}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {s.challanUrl ? (
+                        <a href={s.challanUrl} target="_blank" rel="noreferrer" download={s.challanName || 'challan'}
+                           className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                          <FileText className="w-3.5 h-3.5" /> View
+                        </a>
+                      ) : <span className="text-xs text-muted-foreground">—</span>}
                     </td>
                     <td className="px-4 py-3 text-right">{s._count?.items ?? 0}</td>
                     <td className="px-4 py-3">

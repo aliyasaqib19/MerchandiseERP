@@ -36,7 +36,7 @@ app.use(cors({
     : ['http://localhost:5173', 'http://localhost:5000'],
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '15mb' })); // allow base64 challan/file uploads
 
 // Establish per-request warehouse context (from x-warehouse-id header)
 app.use('/api', warehouseScope);
