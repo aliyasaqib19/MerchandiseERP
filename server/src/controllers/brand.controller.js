@@ -1,9 +1,9 @@
 const prisma = require('../utils/prisma');
 const { logAudit } = require('./audit.controller');
 
-// Brand catalog is company-wide — use the unscoped client so products/distribution
-// are not filtered by the active warehouse.
-const db = prisma.base;
+// Brand product data is scoped to the active warehouse (each warehouse shows
+// only its own brand products) to avoid cross-warehouse confusion.
+const db = prisma;
 
 // ─── List brands (with product count scoped to the active warehouse) ───────────
 

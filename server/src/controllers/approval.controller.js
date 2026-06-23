@@ -129,6 +129,42 @@ async function decide(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function updateApproval(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const { title, description, type, priority, dueDate, resubmit } = req.body || {};
+    const existing = await prisma.approvalRequest.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ message: 'Not found' });
+    if (existing.status === 'APPROVED') return res.status(400).json({ message: 'An approved request cannot be edited.' });
+
+    const data = {};
+    if (title !== undefined) data.title = title;
+    if (description !== undefined) data.description = description;
+    if (type !== undefined) data.type = type;
+    if (priority !== undefined) data.priority = priority;
+    if (dueDate !== undefined) data.dueDate = dueDate ? new Date(dueDate) : null;
+
+    // Editing a rejected/cancelled request can re-open it for approval
+    if (resubmit && (existing.status === 'REJECTED' || existing.status === 'CANCELLED')) {
+      data.status = 'PENDING';
+      data.decidedBy = null;
+      data.decidedAt = null;
+      data.decisionNote = null;
+    }
+
+    const item = await prisma.approvalRequest.update({
+      where: { id },
+      data,
+      include: {
+        requester: { select: { id: true, fullName: true } },
+        decider:   { select: { id: true, fullName: true } },
+      },
+    });
+    logAudit({ userId: req.user.id, action: 'UPDATE', module: 'APPROVALS', resourceId: id, resourceType: 'ApprovalRequest', newValues: { ...data }, req });
+    res.json(item);
+  } catch (err) { next(err); }
+}
+
 async function cancelApproval(req, res, next) {
   try {
     const item = await prisma.approvalRequest.findUnique({ where: { id: Number(req.params.id) } });
@@ -145,4 +181,4 @@ async function cancelApproval(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { listApprovals, getStats, getApproval, createApproval, decide, cancelApproval };
+module.exports = { listApprovals, getStats, getApproval, createApproval, decide, updateApproval, cancelApproval };

@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   CheckCircle, XCircle, Clock, AlertTriangle, Plus, ChevronDown,
-  Loader2, FileText, RefreshCw,
+  Loader2, FileText, RefreshCw, Pencil,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -109,8 +109,80 @@ function CreateDialog({ onCreated, onClose }) {
   );
 }
 
-function DecideDialog({ item, onDone, onClose }) {
-  const [decision, setDecision] = useState('APPROVED');
+function EditDialog({ item, onDone, onClose }) {
+  const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm({
+    resolver: zodResolver(createSchema),
+    defaultValues: {
+      type: item.type,
+      title: item.title,
+      description: item.description || '',
+      priority: item.priority,
+      dueDate: item.dueDate ? new Date(item.dueDate).toISOString().slice(0, 10) : '',
+    },
+  });
+
+  async function onSubmit(values) {
+    try {
+      await api.put(`/approvals/${item.id}`, { ...values, resubmit: true });
+      onDone();
+      onClose();
+    } catch (err) {
+      setError('root', { message: err.response?.data?.message || 'Something went wrong' });
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+        <h2 className="text-lg font-bold">Edit & Resubmit Request</h2>
+        <p className="text-xs text-muted-foreground -mt-2">Saving will send this request back for approval (status → Pending).</p>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {errors.root && (
+            <div className="rounded-md bg-destructive/15 border border-destructive/30 px-3 py-2 text-sm text-destructive">
+              {errors.root.message}
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label>Type *</Label>
+            <Select {...register('type')}>
+              {TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Title *</Label>
+            <Input placeholder="Approval request title" {...register('title')} />
+            {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label>Description</Label>
+            <textarea rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring" {...register('description')} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Priority</Label>
+              <Select {...register('priority')}>
+                {Object.keys(PRIORITY_CFG).map((p) => <option key={p} value={p}>{PRIORITY_CFG[p].label}</option>)}
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Due Date</Label>
+              <Input type="date" {...register('dueDate')} />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />} Save & Resubmit
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function DecideDialog({ item, preset, onDone, onClose }) {
+  const [decision, setDecision] = useState(preset || 'APPROVED');
   const [note, setNote]         = useState('');
   const [saving, setSaving]     = useState(false);
 
@@ -168,7 +240,8 @@ export default function ApprovalsPage() {
   const { user } = useAuthStore();
   const [statusFilter, setStatusFilter] = useState('PENDING');
   const [showCreate, setShowCreate] = useState(false);
-  const [deciding, setDeciding]     = useState(null);
+  const [deciding, setDeciding]     = useState(null); // { item, decision }
+  const [editing, setEditing]       = useState(null);
   const [mine, setMine]             = useState(false);
 
   const { data, isLoading } = useQuery({
@@ -287,11 +360,23 @@ export default function ApprovalsPage() {
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{fmt(item.dueDate)}</td>
                     <td className="px-4 py-3">
-                      {item.status === 'PENDING' && item.requestedBy !== user?.id && (
-                        <Button size="sm" variant="outline" onClick={() => setDeciding(item)}>
-                          Decide
-                        </Button>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        {item.status === 'PENDING' && (
+                          <>
+                            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setDeciding({ item, decision: 'APPROVED' })}>
+                              <CheckCircle className="w-3.5 h-3.5" /> Approve
+                            </Button>
+                            <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => setDeciding({ item, decision: 'REJECTED' })}>
+                              <XCircle className="w-3.5 h-3.5" /> Reject
+                            </Button>
+                          </>
+                        )}
+                        {(item.status === 'REJECTED' || item.status === 'CANCELLED') && (
+                          <Button size="sm" variant="outline" onClick={() => setEditing(item)}>
+                            <Pencil className="w-3.5 h-3.5" /> Edit & Resubmit
+                          </Button>
+                        )}
+                      </div>
                       {item.status !== 'PENDING' && item.decider && (
                         <span className="text-xs text-muted-foreground">By {item.decider.fullName}</span>
                       )}
@@ -308,7 +393,8 @@ export default function ApprovalsPage() {
       </div>
 
       {showCreate && <CreateDialog onCreated={refresh} onClose={() => setShowCreate(false)} />}
-      {deciding   && <DecideDialog item={deciding} onDone={refresh} onClose={() => setDeciding(null)} />}
+      {deciding   && <DecideDialog item={deciding.item} preset={deciding.decision} onDone={refresh} onClose={() => setDeciding(null)} />}
+      {editing    && <EditDialog item={editing} onDone={refresh} onClose={() => setEditing(null)} />}
     </div>
   );
 }
