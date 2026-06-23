@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, ImagePlus, X } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { Loader2, ImagePlus, X, Plus } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -14,8 +14,7 @@ const schema = z.object({
   sku: z.string().min(2, 'Manufacture number is required').toUpperCase(),
   name: z.string().min(2, 'Product name is required'),
   description: z.string().optional(),
-  categoryId: z.string().min(1, 'Category is required'),
-  brandId: z.string().optional(),
+  brandId: z.string().min(1, 'Brand is required'),
   unitType: z.enum(['PIECE', 'METER', 'KG', 'LITER', 'BOX', 'ROLL', 'SET']),
   quantity: z.coerce.number().min(0, 'Cannot be negative').optional(),
   minThreshold: z.coerce.number().min(0, 'Cannot be negative').optional(),
@@ -33,8 +32,13 @@ const UNIT_TYPES = ['PIECE', 'METER', 'KG', 'LITER', 'BOX', 'ROLL', 'SET'];
 
 export default function ProductForm({ onSuccess, defaultValues, productId, lockBrand }) {
   const isEdit = !!productId;
+  const queryClient = useQueryClient();
   const [image, setImage] = useState(defaultValues?.imageUrl || '');
   const [imageError, setImageError] = useState('');
+  const [showNewBrand, setShowNewBrand] = useState(false);
+  const [newBrandName, setNewBrandName] = useState('');
+  const [newBrandError, setNewBrandError] = useState('');
+  const [creatingBrand, setCreatingBrand] = useState(false);
 
   function onImageChange(e) {
     const file = e.target.files?.[0];
@@ -46,11 +50,6 @@ export default function ProductForm({ onSuccess, defaultValues, productId, lockB
     reader.readAsDataURL(file);
   }
 
-  const { data: categories = [] } = useQuery({
-    queryKey: ['inventory-categories'],
-    queryFn: () => api.get('/inventory/categories').then((r) => r.data),
-  });
-
   const { data: brands = [] } = useQuery({
     queryKey: ['brands'],
     queryFn: () => api.get('/brands').then((r) => r.data),
@@ -61,13 +60,13 @@ export default function ProductForm({ onSuccess, defaultValues, productId, lockB
     handleSubmit,
     formState: { errors, isSubmitting },
     setError,
+    setValue,
   } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       sku: defaultValues?.sku || '',
       name: defaultValues?.name || '',
       description: defaultValues?.description || '',
-      categoryId: String(defaultValues?.category?.id || defaultValues?.categoryId || ''),
       brandId: String(defaultValues?.brand?.id || defaultValues?.brandId || ''),
       unitType: defaultValues?.unitType || 'PIECE',
       quantity: defaultValues?.quantity ?? 0,
@@ -78,11 +77,29 @@ export default function ProductForm({ onSuccess, defaultValues, productId, lockB
     },
   });
 
+  async function handleCreateBrand() {
+    const name = newBrandName.trim();
+    setNewBrandError('');
+    if (name.length < 2) { setNewBrandError('Brand name is required'); return; }
+    setCreatingBrand(true);
+    try {
+      const { data: brand } = await api.post('/brands', { name });
+      await queryClient.invalidateQueries({ queryKey: ['brands'] });
+      setValue('brandId', String(brand.id), { shouldValidate: true });
+      setShowNewBrand(false);
+      setNewBrandName('');
+    } catch (err) {
+      setNewBrandError(err.response?.data?.message || 'Could not create brand');
+    } finally {
+      setCreatingBrand(false);
+    }
+  }
+
   async function onSubmit(values) {
     try {
       const payload = {
         ...values,
-        brandId: values.brandId ? Number(values.brandId) : null,
+        brandId: Number(values.brandId),
         costPrice: values.costPrice === '' ? null : Number(values.costPrice),
         sellingPrice: values.sellingPrice === '' ? null : Number(values.sellingPrice),
         imageUrl: image || null,
@@ -173,26 +190,53 @@ export default function ProductForm({ onSuccess, defaultValues, productId, lockB
         </div>
 
         {/* Brand */}
-        <div className="space-y-1.5">
-          <Label>Brand <span className="text-muted-foreground text-xs">(optional)</span></Label>
-          <Select {...register('brandId')} disabled={lockBrand}>
-            <option value="">No brand</option>
-            {brands.map((b) => (
-              <option key={b.id} value={String(b.id)}>{b.name}</option>
-            ))}
-          </Select>
-        </div>
-
-        {/* Category */}
-        <div className="space-y-1.5">
-          <Label>Category</Label>
-          <Select {...register('categoryId')}>
-            <option value="">Select category...</option>
-            {categories.map((c) => (
-              <option key={c.id} value={String(c.id)}>{c.name}</option>
-            ))}
-          </Select>
-          {errors.categoryId && <p className="text-xs text-destructive">{errors.categoryId.message}</p>}
+        <div className="col-span-2 space-y-1.5">
+          <Label>Brand</Label>
+          {showNewBrand ? (
+            <div className="space-y-1.5">
+              <div className="flex gap-2">
+                <Input
+                  autoFocus
+                  placeholder="New brand / vendor name (e.g. Saddar Local Market)"
+                  value={newBrandName}
+                  onChange={(e) => setNewBrandName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateBrand(); } }}
+                />
+                <Button type="button" size="sm" onClick={handleCreateBrand} disabled={creatingBrand}>
+                  {creatingBrand ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add'}
+                </Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => { setShowNewBrand(false); setNewBrandName(''); setNewBrandError(''); }}>
+                  Cancel
+                </Button>
+              </div>
+              {newBrandError && <p className="text-xs text-destructive">{newBrandError}</p>}
+            </div>
+          ) : (
+            <Select
+              {...register('brandId')}
+              disabled={lockBrand}
+              onChange={(e) => {
+                if (e.target.value === '__new__') { setShowNewBrand(true); return; }
+                register('brandId').onChange(e);
+              }}
+            >
+              <option value="">Select brand...</option>
+              {!lockBrand && <option value="__new__">+ Create New Brand…</option>}
+              {brands.map((b) => (
+                <option key={b.id} value={String(b.id)}>{b.name}</option>
+              ))}
+            </Select>
+          )}
+          {errors.brandId && <p className="text-xs text-destructive">{errors.brandId.message}</p>}
+          {!showNewBrand && !lockBrand && (
+            <button
+              type="button"
+              onClick={() => setShowNewBrand(true)}
+              className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+            >
+              <Plus className="w-3 h-3" /> Create new brand / vendor
+            </button>
+          )}
         </div>
 
         {/* Unit Type */}

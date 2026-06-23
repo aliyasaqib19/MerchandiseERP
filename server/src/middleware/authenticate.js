@@ -33,8 +33,16 @@ async function authenticate(req, res, next) {
       email: user.email,
       roleId: user.roleId,
       roleName: user.role.name,
+      warehouseIds: user.warehouseIds || [],
       permissions: user.role.rolePermissions.map((rp) => rp.permission.name),
     };
+
+    // Strict warehouse access control: a user restricted to specific warehouses
+    // may not read or write data for any other warehouse. Empty list = all access.
+    const allowed = user.warehouseIds || [];
+    if (allowed.length > 0 && req.warehouseId != null && !allowed.includes(req.warehouseId)) {
+      return res.status(403).json({ message: 'You do not have access to this warehouse' });
+    }
 
     next();
   } catch {

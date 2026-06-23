@@ -482,8 +482,21 @@ async function main() {
   });
   await prisma.user.upsert({
     where: { email: 'saboor@inventoria.com' },
-    update: { roleId: warehouseStaffRole.id },
-    create: { fullName: 'Saboor (Lahore)', email: 'saboor@inventoria.com', passwordHash: await bcrypt.hash('Saboor@12345', 12), branchId: branch.id, roleId: warehouseStaffRole.id, status: 'ACTIVE' },
+    update: { roleId: warehouseStaffRole.id, warehouseIds: [warehouseLahore.id] },
+    create: { fullName: 'Saboor (Lahore)', email: 'saboor@inventoria.com', passwordHash: await bcrypt.hash('Saboor@12345', 12), branchId: branch.id, roleId: warehouseStaffRole.id, status: 'ACTIVE', warehouseIds: [warehouseLahore.id] },
+  });
+
+  // ── Warehouse-restricted inventory users (strict per-warehouse access) ──────
+  const invManagerRoleId = inventoryManagerRole.id;
+  await prisma.user.upsert({
+    where: { email: 'karachi@inventoria.com' },
+    update: { roleId: invManagerRoleId, warehouseIds: [warehouseKarachi.id] },
+    create: { fullName: 'Karachi Inventory', email: 'karachi@inventoria.com', passwordHash: await bcrypt.hash('Karachi@12345', 12), branchId: branch.id, roleId: invManagerRoleId, status: 'ACTIVE', warehouseIds: [warehouseKarachi.id] },
+  });
+  await prisma.user.upsert({
+    where: { email: 'lahore@inventoria.com' },
+    update: { roleId: invManagerRoleId, warehouseIds: [warehouseLahore.id] },
+    create: { fullName: 'Lahore Inventory', email: 'lahore@inventoria.com', passwordHash: await bcrypt.hash('Lahore@12345', 12), branchId: branch.id, roleId: invManagerRoleId, status: 'ACTIVE', warehouseIds: [warehouseLahore.id] },
   });
 
   // ── Quotations ─────────────────────────────────────────────────────────────

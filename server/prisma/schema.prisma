@@ -17,6 +17,7 @@ model User {
   branchId      Int?
   roleId        Int
   status        UserStatus @default(ACTIVE)
+  warehouseIds  Int[]      @default([]) // restricts user to these warehouses; empty = all access
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 

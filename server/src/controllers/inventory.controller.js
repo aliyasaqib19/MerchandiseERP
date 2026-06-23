@@ -153,6 +153,15 @@ async function createProduct(req, res) {
   const exists = await prisma.product.findUnique({ where: { sku } });
   if (exists) return res.status(409).json({ message: 'SKU already exists' });
 
+  // Category is no longer collected from the UI — fall back to a default bucket.
+  let resolvedCategoryId = categoryId ? Number(categoryId) : null;
+  if (!resolvedCategoryId) {
+    const defaultCat = await prisma.base.category.upsert({
+      where: { name: 'Uncategorized' }, update: {}, create: { name: 'Uncategorized' },
+    });
+    resolvedCategoryId = defaultCat.id;
+  }
+
   const initialQty = Number(quantity) || 0;
 
   const product = await prisma.$transaction(async (tx) => {
@@ -161,7 +170,7 @@ async function createProduct(req, res) {
         sku: sku.toUpperCase().trim(),
         name,
         description,
-        categoryId: Number(categoryId),
+        categoryId: resolvedCategoryId,
         brandId: brandId ? Number(brandId) : null,
         unitType: unitType || 'PIECE',
         quantity: initialQty,

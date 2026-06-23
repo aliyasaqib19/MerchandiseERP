@@ -10,6 +10,7 @@ async function getUsers(req, res) {
       email: true,
       phone: true,
       status: true,
+      warehouseIds: true,
       createdAt: true,
       role: { select: { id: true, name: true } },
       branch: { select: { id: true, name: true } },
@@ -28,6 +29,7 @@ async function getUser(req, res) {
       email: true,
       phone: true,
       status: true,
+      warehouseIds: true,
       createdAt: true,
       role: { select: { id: true, name: true } },
       branch: { select: { id: true, name: true } },
@@ -38,7 +40,7 @@ async function getUser(req, res) {
 }
 
 async function createUser(req, res) {
-  const { fullName, email, phone, password, branchId, roleId, status } = req.body;
+  const { fullName, email, phone, password, branchId, roleId, status, warehouseIds } = req.body;
 
   const exists = await prisma.user.findUnique({ where: { email } });
   if (exists) return res.status(409).json({ message: 'Email already in use' });
@@ -54,6 +56,7 @@ async function createUser(req, res) {
       branchId: branchId ? Number(branchId) : null,
       roleId: Number(roleId),
       status: status || 'ACTIVE',
+      warehouseIds: Array.isArray(warehouseIds) ? warehouseIds.map(Number) : [],
     },
     select: {
       id: true,
@@ -61,6 +64,7 @@ async function createUser(req, res) {
       email: true,
       phone: true,
       status: true,
+      warehouseIds: true,
       role: { select: { id: true, name: true } },
       branch: { select: { id: true, name: true } },
     },
@@ -71,7 +75,7 @@ async function createUser(req, res) {
 }
 
 async function updateUser(req, res) {
-  const { fullName, phone, branchId, roleId, status } = req.body;
+  const { fullName, phone, branchId, roleId, status, warehouseIds } = req.body;
 
   const user = await prisma.user.update({
     where: { id: Number(req.params.id) },
@@ -81,6 +85,7 @@ async function updateUser(req, res) {
       branchId: branchId ? Number(branchId) : null,
       roleId: roleId ? Number(roleId) : undefined,
       status,
+      warehouseIds: Array.isArray(warehouseIds) ? warehouseIds.map(Number) : undefined,
     },
     select: {
       id: true,
@@ -88,6 +93,7 @@ async function updateUser(req, res) {
       email: true,
       phone: true,
       status: true,
+      warehouseIds: true,
       role: { select: { id: true, name: true } },
       branch: { select: { id: true, name: true } },
     },

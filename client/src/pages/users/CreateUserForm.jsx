@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -39,6 +40,19 @@ export default function CreateUserForm({ onSuccess, defaultValues, userId }) {
     queryFn: () => api.get('/roles').then((r) => r.data),
   });
 
+  const { data: warehouses = [] } = useQuery({
+    queryKey: ['warehouses'],
+    queryFn: () => api.get('/warehouses').then((r) => r.data),
+  });
+
+  const [warehouseIds, setWarehouseIds] = useState(defaultValues?.warehouseIds || []);
+
+  function toggleWarehouse(id) {
+    setWarehouseIds((prev) =>
+      prev.includes(id) ? prev.filter((w) => w !== id) : [...prev, id]
+    );
+  }
+
   const {
     register,
     handleSubmit,
@@ -59,12 +73,13 @@ export default function CreateUserForm({ onSuccess, defaultValues, userId }) {
 
   async function onSubmit(values) {
     try {
+      const base = { ...values, warehouseIds };
       if (isEdit) {
-        const payload = { ...values };
+        const payload = { ...base };
         if (!payload.password) delete payload.password;
         await api.put(`/users/${userId}`, payload);
       } else {
-        await api.post('/users', values);
+        await api.post('/users', base);
       }
       onSuccess?.();
     } catch (err) {
@@ -129,6 +144,32 @@ export default function CreateUserForm({ onSuccess, defaultValues, userId }) {
             <option value="INACTIVE">Inactive</option>
             <option value="SUSPENDED">Suspended</option>
           </Select>
+        </div>
+
+        <div className="space-y-1.5 col-span-2">
+          <Label>Warehouse Access</Label>
+          <div className="rounded-md border divide-y">
+            {warehouses.map((w) => (
+              <label key={w.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/40 text-sm">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={warehouseIds.includes(w.id)}
+                  onChange={() => toggleWarehouse(w.id)}
+                />
+                <span>{w.name}</span>
+                {w.city && <span className="text-xs text-muted-foreground">· {w.city}</span>}
+              </label>
+            ))}
+            {warehouses.length === 0 && (
+              <p className="px-3 py-2 text-xs text-muted-foreground">No warehouses available</p>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {warehouseIds.length === 0
+              ? 'No restriction — this user can access all warehouses (use for Admin / Boss).'
+              : `Restricted to ${warehouseIds.length} warehouse${warehouseIds.length > 1 ? 's' : ''}. They cannot see or edit any other warehouse.`}
+          </p>
         </div>
       </div>
 

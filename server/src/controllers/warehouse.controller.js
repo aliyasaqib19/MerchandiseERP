@@ -4,7 +4,10 @@ const { logAudit } = require('./audit.controller');
 // GET /warehouses
 async function getWarehouses(req, res) {
   try {
+    const allowed = req.user?.warehouseIds || [];
+    const where = allowed.length > 0 ? { id: { in: allowed } } : {};
     const warehouses = await prisma.warehouse.findMany({
+      where,
       orderBy: { name: 'asc' },
       include: {
         _count: { select: { products: true, transactions: true } },
