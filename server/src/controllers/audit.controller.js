@@ -23,7 +23,7 @@ async function listAuditLogs(req, res, next) {
       prisma.auditLog.count({ where }),
       prisma.auditLog.findMany({
         where,
-        include: { user: { select: { id: true, fullName: true, email: true } } },
+        include: { user: { select: { id: true, fullName: true, email: true, role: { select: { name: true } } } } },
         orderBy: { createdAt: 'desc' },
         skip: (Number(page) - 1) * Number(limit),
         take: Number(limit),

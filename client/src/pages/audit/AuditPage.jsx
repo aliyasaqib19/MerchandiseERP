@@ -177,6 +177,7 @@ export default function AuditPage() {
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Timestamp</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">User</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Module</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Role</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Action</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Resource</th>
                 </tr>
@@ -197,6 +198,13 @@ export default function AuditPage() {
                       </td>
                       <td className="px-4 py-2.5">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cls}`}>{log.module}</span>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        {log.user?.role ? (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-700 font-medium whitespace-nowrap">{log.user.role.name}</span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-2.5 font-mono text-xs">{log.action}</td>
                       <td className="px-4 py-2.5 text-xs">
