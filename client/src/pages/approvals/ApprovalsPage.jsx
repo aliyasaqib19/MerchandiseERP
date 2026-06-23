@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -474,9 +475,15 @@ export default function ApprovalsPage() {
                 return (
                   <tr key={item.id} className="hover:bg-muted/10">
                     <td className="px-4 py-3 font-medium">
-                      <button onClick={() => setViewing(item)} className="text-left text-primary hover:underline font-medium">
-                        {item.title}
-                      </button>
+                      {item.referenceType === 'Shipment' && item.referenceId ? (
+                        <Link to={`/inventory/shipments/${item.referenceId}`} className="text-left text-primary hover:underline font-medium">
+                          {item.title}
+                        </Link>
+                      ) : (
+                        <button onClick={() => setViewing(item)} className="text-left text-primary hover:underline font-medium">
+                          {item.title}
+                        </button>
+                      )}
                       {item.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{item.description}</p>}
                       <p className="text-[11px] text-primary/70 mt-0.5">View details →</p>
                     </td>
