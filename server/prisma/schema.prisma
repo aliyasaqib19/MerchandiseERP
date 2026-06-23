@@ -909,6 +909,7 @@ enum ApprovalType {
   USER_CREATION
   ROLE_CHANGE
   DOCUMENT
+  SHIPMENT
   OTHER
 }
 

@@ -189,9 +189,17 @@ function DecideDialog({ item, preset, onDone, onClose }) {
   async function submit() {
     setSaving(true);
     try {
-      await api.post(`/approvals/${item.id}/decide`, { decision, decisionNote: note });
+      // Shipment-linked approvals must act on the shipment itself (stock + sync)
+      if (item.referenceType === 'Shipment' && item.referenceId) {
+        const verb = decision === 'APPROVED' ? 'approve' : 'reject';
+        await api.post(`/shipments/${item.referenceId}/${verb}`, { note });
+      } else {
+        await api.post(`/approvals/${item.id}/decide`, { decision, decisionNote: note });
+      }
       onDone();
       onClose();
+    } catch (e) {
+      alert(e?.response?.data?.message || 'Action failed');
     } finally { setSaving(false); }
   }
 

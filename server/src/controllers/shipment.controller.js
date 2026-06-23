@@ -34,6 +34,15 @@ async function nextShipmentNumber() {
 
 const LINK = '/inventory/shipments';
 
+// Keep the linked Approval Workflow request in sync with the shipment decision
+async function syncApprovalDecision(shipmentId, decision, userId, note) {
+  // Unscoped so it works regardless of the active warehouse
+  await prisma.base.approvalRequest.updateMany({
+    where: { referenceType: 'Shipment', referenceId: shipmentId, status: 'PENDING' },
+    data: { status: decision, decidedBy: userId, decidedAt: new Date(), decisionNote: note || null },
+  });
+}
+
 // Return previously-deducted source stock (used on reject / decline)
 async function restoreSourceStock(tx, shipment, userId) {
   for (const item of shipment.items) {
@@ -181,6 +190,21 @@ async function submitShipment(req, res) {
     return res.status(err.status || 500).json({ message: err.message || 'Failed to submit shipment' });
   }
 
+  // Create a matching Approval Workflow request (so it shows in the Approvals tab)
+  const itemCount = shipment.items.length;
+  await prisma.approvalRequest.create({
+    data: {
+      type: 'SHIPMENT',
+      status: 'PENDING',
+      priority: 'HIGH',
+      title: `Shipment ${shipment.shipmentNumber}`,
+      description: `${shipment.sourceWarehouse.name} → ${shipment.destWarehouse.name} · ${itemCount} item(s)`,
+      referenceType: 'Shipment',
+      referenceId: id,
+      requestedBy: req.user.id,
+    },
+  });
+
   const bosses = await getBossUserIds();
   await notify(bosses, {
     type: 'APPROVAL_REQUIRED',
@@ -209,6 +233,7 @@ async function approveShipment(req, res) {
     where: { id },
     data: { status: 'APPROVED', approvedBy: req.user.id, approvedAt: new Date(), decisionNote: note || null },
   });
+  await syncApprovalDecision(id, 'APPROVED', req.user.id, note);
 
   const recipients = [...(await getBossUserIds()), shipment.createdBy];
   await notify(recipients, {
@@ -238,6 +263,7 @@ async function rejectShipment(req, res) {
       data: { status: 'REJECTED', approvedBy: req.user.id, approvedAt: new Date(), decisionNote: note || null, stockDeducted: false },
     });
   });
+  await syncApprovalDecision(id, 'REJECTED', req.user.id, note);
 
   await notify([shipment.createdBy], {
     type: 'APPROVAL_DECIDED',
