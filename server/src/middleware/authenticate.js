@@ -39,11 +39,23 @@ async function authenticate(req, res, next) {
       permissions,
     };
 
-    // Strict warehouse access control: a user restricted to specific warehouses
-    // may not read or write data for any other warehouse. Empty list = all access.
+    // Warehouse access: a user assigned to specific warehouses has FULL access
+    // (per their role permissions) in those warehouses, and VIEW-ONLY access in
+    // every other warehouse. Empty list = full access everywhere (Admin / Boss).
+    // System Administrator bypasses this entirely.
     const allowed = user.warehouseIds || [];
-    if (allowed.length > 0 && req.warehouseId != null && !allowed.includes(req.warehouseId)) {
-      return res.status(403).json({ message: 'You do not have access to this warehouse' });
+    const isAdmin = roleNames.includes('System Administrator');
+    const isWrite = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+    if (
+      !isAdmin &&
+      allowed.length > 0 &&
+      req.warehouseId != null &&
+      !allowed.includes(req.warehouseId) &&
+      isWrite
+    ) {
+      return res.status(403).json({
+        message: 'View-only: you can view this warehouse but cannot modify it. Switch to your assigned warehouse to make changes.',
+      });
     }
 
     next();

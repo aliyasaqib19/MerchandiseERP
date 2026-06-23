@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import ProductForm from '../../components/inventory/ProductForm';
 import api from '../../lib/api';
+import { useWarehouseAccess } from '../../hooks/useWarehouseAccess';
 
 function money(n) {
   return `Rs. ${Number(n || 0).toLocaleString()}`;
@@ -15,6 +16,7 @@ export default function BrandDetailPage() {
   const { id } = useParams();
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
+  const { canEdit } = useWarehouseAccess();
 
   const { data: brand } = useQuery({
     queryKey: ['brand', id],
@@ -49,9 +51,11 @@ export default function BrandDetailPage() {
             <p className="text-muted-foreground text-sm mt-0.5">{products.length} product{products.length !== 1 ? 's' : ''} in this warehouse</p>
           </div>
         </div>
-        <Button onClick={() => setShowAdd(true)}>
-          <Plus className="w-4 h-4" /> Add Product
-        </Button>
+        {canEdit && (
+          <Button onClick={() => setShowAdd(true)}>
+            <Plus className="w-4 h-4" /> Add Product
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -61,7 +65,7 @@ export default function BrandDetailPage() {
           <AlertCircle className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
           <p className="font-medium">No products for this brand yet</p>
           <p className="text-sm text-muted-foreground mt-1">Add a product to this brand for the current warehouse.</p>
-          <Button className="mt-4" onClick={() => setShowAdd(true)}><Plus className="w-4 h-4" /> Add Product</Button>
+          {canEdit && <Button className="mt-4" onClick={() => setShowAdd(true)}><Plus className="w-4 h-4" /> Add Product</Button>}
         </div>
       ) : (
         <div className="border rounded-xl overflow-hidden">

@@ -4,10 +4,9 @@ const { logAudit } = require('./audit.controller');
 // GET /warehouses
 async function getWarehouses(req, res) {
   try {
-    const allowed = req.user?.warehouseIds || [];
-    const where = allowed.length > 0 ? { id: { in: allowed } } : {};
+    // All warehouses are listed so assigned users can switch in to view other
+    // warehouses (read-only). Write access is enforced per-request in authenticate.
     const warehouses = await prisma.warehouse.findMany({
-      where,
       orderBy: { name: 'asc' },
       include: {
         _count: { select: { products: true, transactions: true } },

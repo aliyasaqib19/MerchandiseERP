@@ -13,6 +13,7 @@ import { TransactionTypeBadge } from '../../components/inventory/TransactionType
 import ProductForm from '../../components/inventory/ProductForm';
 import StockForm from '../../components/inventory/StockForm';
 import api from '../../lib/api';
+import { useWarehouseAccess } from '../../hooks/useWarehouseAccess';
 
 const STATUS_VARIANT = { ACTIVE: 'success', INACTIVE: 'secondary', DISCONTINUED: 'destructive' };
 
@@ -22,6 +23,7 @@ export default function ProductDetailPage() {
   const queryClient = useQueryClient();
   const [showEdit, setShowEdit] = useState(false);
   const [stockAction, setStockAction] = useState(null);
+  const { canEdit } = useWarehouseAccess();
 
   const { data: product, isLoading, error } = useQuery({
     queryKey: ['inventory-product', id],
@@ -76,15 +78,19 @@ export default function ProductDetailPage() {
         </div>
 
         <div className="flex gap-2 flex-shrink-0">
-          <Button variant="outline" size="sm" onClick={() => setStockAction({ type: 'out' })} className="text-red-600 border-red-200 hover:bg-red-50">
-            <ArrowUpCircle className="w-4 h-4" /> Stock Out
-          </Button>
-          <Button size="sm" onClick={() => setStockAction({ type: 'in' })} className="bg-green-600 hover:bg-green-700">
-            <ArrowDownCircle className="w-4 h-4" /> Stock In
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowEdit(true)}>
-            <Pencil className="w-4 h-4" /> Edit
-          </Button>
+          {canEdit && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setStockAction({ type: 'out' })} className="text-red-600 border-red-200 hover:bg-red-50">
+                <ArrowUpCircle className="w-4 h-4" /> Stock Out
+              </Button>
+              <Button size="sm" onClick={() => setStockAction({ type: 'in' })} className="bg-green-600 hover:bg-green-700">
+                <ArrowDownCircle className="w-4 h-4" /> Stock In
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowEdit(true)}>
+                <Pencil className="w-4 h-4" /> Edit
+              </Button>
+            </>
+          )}
         </div>
       </div>
 

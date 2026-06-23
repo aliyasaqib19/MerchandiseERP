@@ -16,11 +16,13 @@ import ProductForm from '../../components/inventory/ProductForm';
 import StockForm from '../../components/inventory/StockForm';
 import api from '../../lib/api';
 import { cn } from '../../lib/utils';
+import { useWarehouseAccess } from '../../hooks/useWarehouseAccess';
 
 const STATUS_VARIANT = { ACTIVE: 'success', INACTIVE: 'secondary', DISCONTINUED: 'destructive' };
 
 export default function ProductListPage() {
   const queryClient = useQueryClient();
+  const { canEdit } = useWarehouseAccess();
   const [search, setSearch] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('ACTIVE');
@@ -146,13 +148,17 @@ export default function ProductListPage() {
           <Button variant="outline" onClick={downloadTemplate} title="Download a sample Excel template">
             <Download className="w-4 h-4" /> Template
           </Button>
-          <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importMutation.isPending}>
-            {importMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            Upload Excel
-          </Button>
-          <Button onClick={() => setShowCreate(true)}>
-            <Plus className="w-4 h-4" /> Add Product
-          </Button>
+          {canEdit && (
+            <>
+              <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importMutation.isPending}>
+                {importMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                Upload Excel
+              </Button>
+              <Button onClick={() => setShowCreate(true)}>
+                <Plus className="w-4 h-4" /> Add Product
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -267,33 +273,40 @@ export default function ProductListPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                          variant="ghost" size="icon"
-                          title="Stock In"
-                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                          onClick={() => setStockAction({ product, type: 'in' })}
-                        >
-                          <ArrowDownCircle className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost" size="icon"
-                          title="Stock Out"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => setStockAction({ product, type: 'out' })}
-                        >
-                          <ArrowUpCircle className="w-4 h-4" />
-                        </Button>
+                        {canEdit && (
+                          <>
+                            <Button
+                              variant="ghost" size="icon"
+                              title="Stock In"
+                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                              onClick={() => setStockAction({ product, type: 'in' })}
+                            >
+                              <ArrowDownCircle className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost" size="icon"
+                              title="Stock Out"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => setStockAction({ product, type: 'out' })}
+                            >
+                              <ArrowUpCircle className="w-4 h-4" />
+                            </Button>
+                          </>
+                        )}
                         <Link to={`/inventory/products/${product.id}`}>
                           <Button variant="ghost" size="icon" title="View Details">
                             <Eye className="w-4 h-4" />
                           </Button>
                         </Link>
-                        <Button
-                          variant="ghost" size="icon" title="Edit"
-                          onClick={() => setEditProduct(product)}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
+                        {canEdit && (
+                          <Button
+                            variant="ghost" size="icon" title="Edit"
+                            onClick={() => setEditProduct(product)}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {canEdit && (
                         <Button
                           variant="ghost" size="icon" title="Delete"
                           className="text-destructive hover:text-destructive hover:bg-destructive/10"
@@ -303,6 +316,7 @@ export default function ProductListPage() {
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
+                        )}
                       </div>
                     </td>
                   </tr>

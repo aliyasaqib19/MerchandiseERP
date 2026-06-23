@@ -63,6 +63,7 @@ async function login(req, res) {
       email: user.email,
       role: user.role.name,
       roles,
+      warehouseIds: user.warehouseIds || [],
       permissions,
     },
   });
@@ -145,6 +146,7 @@ async function me(req, res) {
     role: user.role.name,
     roles,
     branch: user.branch?.name || null,
+    warehouseIds: user.warehouseIds || [],
     permissions,
   });
 }

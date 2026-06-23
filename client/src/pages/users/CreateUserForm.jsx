@@ -176,7 +176,7 @@ export default function CreateUserForm({ onSuccess, defaultValues, userId }) {
         </div>
 
         <div className="space-y-1.5 col-span-2">
-          <Label>Warehouse Access</Label>
+          <Label>Warehouse Access <span className="text-muted-foreground text-xs">(full access here, view-only elsewhere)</span></Label>
           <div className="rounded-md border divide-y">
             {warehouses.map((w) => (
               <label key={w.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/40 text-sm">
@@ -196,8 +196,8 @@ export default function CreateUserForm({ onSuccess, defaultValues, userId }) {
           </div>
           <p className="text-xs text-muted-foreground">
             {warehouseIds.length === 0
-              ? 'No restriction — this user can access all warehouses (use for Admin / Boss).'
-              : `Restricted to ${warehouseIds.length} warehouse${warehouseIds.length > 1 ? 's' : ''}. They cannot see or edit any other warehouse.`}
+              ? 'No restriction — full access to all warehouses (use for Admin / Boss).'
+              : `Full access (per their roles) in ${warehouseIds.length} selected warehouse${warehouseIds.length > 1 ? 's' : ''}; view-only in every other warehouse.`}
           </p>
         </div>
       </div>

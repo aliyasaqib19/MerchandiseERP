@@ -10,6 +10,7 @@ import { Select } from '../../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { useWarehouseStore } from '../../store/warehouseStore';
 import { useAuthStore } from '../../store/authStore';
+import { useWarehouseAccess } from '../../hooks/useWarehouseAccess';
 import api from '../../lib/api';
 
 const STATUS_META = {
@@ -206,9 +207,11 @@ export default function ShipmentsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [detailsFor, setDetailsFor] = useState(null);
 
-  const canCreate  = hasPermission('SHIPMENTS_CREATE');
-  const canApprove = hasPermission('SHIPMENTS_APPROVE');
-  const canReceive = hasPermission('SHIPMENTS_RECEIVE');
+  const { canEdit } = useWarehouseAccess();
+  // Mutating actions require write access to the active warehouse (view-only elsewhere).
+  const canCreate  = hasPermission('SHIPMENTS_CREATE') && canEdit;
+  const canApprove = hasPermission('SHIPMENTS_APPROVE') && canEdit;
+  const canReceive = hasPermission('SHIPMENTS_RECEIVE') && canEdit;
 
   const { data: shipments = [], isLoading } = useQuery({
     queryKey: ['shipments'],
