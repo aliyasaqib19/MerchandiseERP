@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import * as XLSX from 'xlsx';
 import {
   Plus, Search, Filter, Pencil, Trash2, Eye,
-  ArrowDownCircle, ArrowUpCircle, Package,
+  ArrowDownCircle, ArrowUpCircle, Package, Upload, Download, Loader2,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -60,6 +61,70 @@ export default function ProductListPage() {
     queryClient.invalidateQueries({ queryKey: ['inventory-transactions'] });
   }
 
+  // ── Excel bulk import ──
+  const fileInputRef = useRef(null);
+
+  const importMutation = useMutation({
+    mutationFn: (rows) => api.post('/inventory/products/bulk', { products: rows }).then((r) => r.data),
+    onSuccess: (res) => {
+      invalidateAll();
+      queryClient.invalidateQueries({ queryKey: ['brands'] });
+      let msg = `Import complete:\n• ${res.created} added\n• ${res.updated} updated\n• ${res.skipped} skipped`;
+      if (res.errors?.length) msg += `\n\nIssues:\n${res.errors.join('\n')}`;
+      alert(msg);
+    },
+    onError: (e) => alert(e?.response?.data?.message || 'Import failed'),
+  });
+
+  function pick(row, keys) {
+    for (const k of Object.keys(row)) {
+      const norm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (keys.includes(norm)) return row[k];
+    }
+    return undefined;
+  }
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf);
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      const rows = json
+        .map((row) => ({
+          sku:          pick(row, ['manufactureno', 'manufacturenumber', 'sku', 'modelno', 'model']),
+          name:         pick(row, ['product', 'productname', 'name', 'description']),
+          brand:        pick(row, ['brand', 'brandname']),
+          quantity:     pick(row, ['stock', 'quantity', 'qty']),
+          costPrice:    pick(row, ['cost', 'costprice']),
+          sellingPrice: pick(row, ['price', 'sellingprice', 'sellprice']),
+        }))
+        .filter((r) => String(r.sku || '').trim() || String(r.name || '').trim());
+      if (rows.length === 0) {
+        alert('No rows found. Make sure the sheet has columns: Manufacture No., Product, Brand, Stock, Cost, Price.');
+        return;
+      }
+      importMutation.mutate(rows);
+    } catch (err) {
+      alert('Could not read the file. Please upload a valid .xlsx / .xls / .csv file.');
+    } finally {
+      e.target.value = '';
+    }
+  }
+
+  function downloadTemplate() {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['Manufacture No.', 'Product', 'Brand', 'Stock', 'Cost', 'Price'],
+      ['ED-100', 'Smoke Detector', 'INIM', 10, 900, 1300],
+      ['CFP-702', '2 Zone Panel', 'Context Plus', 26, 6500, 9000],
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Products');
+    XLSX.writeFile(wb, 'product-import-template.xlsx');
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -70,9 +135,25 @@ export default function ProductListPage() {
             {products.length} product{products.length !== 1 ? 's' : ''} found
           </p>
         </div>
-        <Button onClick={() => setShowCreate(true)}>
-          <Plus className="w-4 h-4" /> Add Product
-        </Button>
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={handleFile}
+          />
+          <Button variant="outline" onClick={downloadTemplate} title="Download a sample Excel template">
+            <Download className="w-4 h-4" /> Template
+          </Button>
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importMutation.isPending}>
+            {importMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            Upload Excel
+          </Button>
+          <Button onClick={() => setShowCreate(true)}>
+            <Plus className="w-4 h-4" /> Add Product
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}

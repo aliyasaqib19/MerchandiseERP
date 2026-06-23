@@ -24,6 +24,7 @@ router.delete('/categories/:id', authorize('INVENTORY_DELETE'), ctrl.deleteCateg
 
 // ─── Products ─────────────────────────────────────────────────────────────────
 router.get('/products', authorize('INVENTORY_VIEW'), ctrl.getProducts);
+router.post('/products/bulk', authorize('INVENTORY_CREATE'), ctrl.bulkImportProducts);
 router.get('/products/:id', authorize('INVENTORY_VIEW'), ctrl.getProduct);
 
 router.post('/products',

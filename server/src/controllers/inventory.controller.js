@@ -397,10 +397,105 @@ async function getTransactions(req, res) {
   });
 }
 
+// ─── Bulk import from Excel (rows parsed on the client) ────────────────────────
+
+async function bulkImportProducts(req, res) {
+  const warehouseId = req.warehouseId;
+  if (!warehouseId) return res.status(400).json({ message: 'Select a warehouse first.' });
+
+  const { products } = req.body || {};
+  if (!Array.isArray(products) || products.length === 0) {
+    return res.status(400).json({ message: 'No rows found in the uploaded sheet.' });
+  }
+
+  const db = prisma.base; // unscoped — we handle warehouseId explicitly
+  const defaultCat = await db.category.upsert({
+    where: { name: 'Imported' }, update: {}, create: { name: 'Imported' },
+  });
+
+  // Cache brand lookups within this import
+  const brandCache = {};
+  async function resolveBrandId(name) {
+    const key = name.trim().toLowerCase();
+    if (!key) return null;
+    if (brandCache[key] !== undefined) return brandCache[key];
+    const brand = await db.brand.upsert({ where: { name: name.trim() }, update: {}, create: { name: name.trim() } });
+    brandCache[key] = brand.id;
+    return brand.id;
+  }
+
+  let created = 0, updated = 0, skipped = 0;
+  const errors = [];
+
+  for (let i = 0; i < products.length; i++) {
+    const row = products[i] || {};
+    try {
+      const sku = String(row.sku ?? '').trim();
+      const name = String(row.name ?? '').trim();
+      if (!sku || !name) { skipped++; errors.push(`Row ${i + 1}: missing manufacture no. or product name`); continue; }
+
+      const qty = Number(row.quantity) || 0;
+      const cost = row.costPrice === '' || row.costPrice == null ? null : Number(row.costPrice);
+      const price = row.sellingPrice === '' || row.sellingPrice == null ? null : Number(row.sellingPrice);
+      const brandId = row.brand ? await resolveBrandId(String(row.brand)) : null;
+
+      const existing = await db.product.findUnique({ where: { sku: sku.toUpperCase() } });
+
+      if (existing) {
+        await db.product.update({
+          where: { id: existing.id },
+          data: {
+            name,
+            brandId: brandId ?? existing.brandId,
+            costPrice: cost ?? existing.costPrice,
+            sellingPrice: price ?? existing.sellingPrice,
+            quantity: qty,
+          },
+        });
+        if (qty !== existing.quantity) {
+          await db.inventoryTransaction.create({
+            data: {
+              productId: existing.id, type: 'ADJUSTMENT', quantity: Math.abs(qty - existing.quantity),
+              balanceAfter: qty, reference: 'Excel import', notes: 'Quantity set via Excel import',
+              warehouseId: existing.warehouseId || warehouseId, createdBy: req.user.id,
+            },
+          });
+        }
+        updated++;
+      } else {
+        const p = await db.product.create({
+          data: {
+            sku: sku.toUpperCase(), name, categoryId: defaultCat.id, brandId,
+            unitType: 'PIECE', quantity: qty, minThreshold: 0,
+            costPrice: cost, sellingPrice: price, status: 'ACTIVE', warehouseId,
+          },
+        });
+        if (qty > 0) {
+          await db.inventoryTransaction.create({
+            data: {
+              productId: p.id, type: 'STOCK_IN', quantity: qty, balanceAfter: qty,
+              reference: 'Excel import', notes: 'Initial stock via Excel import',
+              warehouseId, createdBy: req.user.id,
+            },
+          });
+        }
+        created++;
+      }
+    } catch (e) {
+      skipped++;
+      errors.push(`Row ${i + 1}: ${e.message}`);
+    }
+  }
+
+  logAudit({ userId: req.user.id, action: 'IMPORT', module: 'INVENTORY', resourceType: 'Product', newValues: { created, updated, skipped }, req });
+  res.json({ created, updated, skipped, errors: errors.slice(0, 25) });
+}
+
 module.exports = {
   getStats,
   getCategories, createCategory, updateCategory, deleteCategory,
   getProducts, getProduct, createProduct, updateProduct, deleteProduct,
   stockIn, stockOut, adjustStock,
   getTransactions,
+  bulkImportProducts,
 };
