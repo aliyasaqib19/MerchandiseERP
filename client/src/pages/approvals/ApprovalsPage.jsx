@@ -191,15 +191,22 @@ function Row({ label, value }) {
   );
 }
 
+// A shipment-linked approval, tolerant of casing / type-only records.
+function shipmentRefId(item) {
+  const isShip = item.type === 'SHIPMENT' || (item.referenceType || '').toLowerCase() === 'shipment';
+  return isShip && item.referenceId ? item.referenceId : null;
+}
+
 function DetailsDialog({ item, onClose }) {
-  const isShipment = item.referenceType === 'Shipment' && item.referenceId;
+  const isShipment = !!shipmentRefId(item);
   const sc = STATUS_CFG[item.status] || STATUS_CFG.PENDING;
   const pc = PRIORITY_CFG[item.priority] || PRIORITY_CFG.NORMAL;
 
+  const shipRefId = shipmentRefId(item);
   const { data: shipment, isLoading } = useQuery({
-    queryKey: ['shipment-detail', item.referenceId],
-    queryFn: () => api.get(`/shipments/${item.referenceId}`).then((r) => r.data),
-    enabled: !!isShipment,
+    queryKey: ['shipment-detail', shipRefId],
+    queryFn: () => api.get(`/shipments/${shipRefId}`).then((r) => r.data),
+    enabled: !!shipRefId,
   });
 
   return (
@@ -308,9 +315,10 @@ function DecideDialog({ item, preset, onDone, onClose }) {
     setSaving(true);
     try {
       // Shipment-linked approvals must act on the shipment itself (stock + sync)
-      if (item.referenceType === 'Shipment' && item.referenceId) {
+      const shipId = shipmentRefId(item);
+      if (shipId) {
         const verb = decision === 'APPROVED' ? 'approve' : 'reject';
-        await api.post(`/shipments/${item.referenceId}/${verb}`, { note });
+        await api.post(`/shipments/${shipId}/${verb}`, { note });
       } else {
         await api.post(`/approvals/${item.id}/decide`, { decision, decisionNote: note });
       }
@@ -475,8 +483,8 @@ export default function ApprovalsPage() {
                 return (
                   <tr key={item.id} className="hover:bg-muted/10">
                     <td className="px-4 py-3 font-medium">
-                      {item.referenceType === 'Shipment' && item.referenceId ? (
-                        <Link to={`/inventory/shipments/${item.referenceId}`} className="text-left text-primary hover:underline font-medium">
+                      {shipmentRefId(item) ? (
+                        <Link to={`/inventory/shipments/${shipmentRefId(item)}`} className="text-left text-primary hover:underline font-medium">
                           {item.title}
                         </Link>
                       ) : (
@@ -501,7 +509,7 @@ export default function ApprovalsPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
                         {item.status === 'PENDING' && (() => {
-                          const isShipment = item.referenceType === 'Shipment';
+                          const isShipment = !!shipmentRefId(item);
                           const allowed = isShipment ? canApproveShipments : canApproveGeneric;
                           if (!allowed) {
                             return <span className="text-xs text-muted-foreground">{isShipment ? 'Boss approval required' : 'Awaiting approval'}</span>;
