@@ -35,6 +35,7 @@ import {
   UserCircle,
   Warehouse,
   Repeat,
+  Truck,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
@@ -65,6 +66,7 @@ const NAV_SECTIONS = [
           { label: 'Overview',        icon: PieChart,        to: '/inventory' },
           { label: 'Products',        icon: Box,             to: '/inventory/products' },
           { label: 'Stock Movements', icon: ArrowLeftRight,  to: '/inventory/movements' },
+          { label: 'Shipments',       icon: Truck,           to: '/inventory/shipments' },
         ],
       },
       {

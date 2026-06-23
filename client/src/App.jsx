@@ -20,6 +20,7 @@ import InventoryDashboard from './pages/inventory/InventoryDashboard';
 import ProductListPage from './pages/inventory/ProductListPage';
 import ProductDetailPage from './pages/inventory/ProductDetailPage';
 import InventoryHistoryPage from './pages/inventory/InventoryHistoryPage';
+import ShipmentsPage from './pages/inventory/ShipmentsPage';
 
 // Warehouses
 import WarehouseSelectPage from './pages/warehouses/WarehouseSelectPage';
@@ -102,6 +103,7 @@ export default function App() {
             <Route path="/inventory/products" element={<Guarded permission="INVENTORY_VIEW"><ProductListPage /></Guarded>} />
             <Route path="/inventory/products/:id" element={<Guarded permission="INVENTORY_VIEW"><ProductDetailPage /></Guarded>} />
             <Route path="/inventory/movements" element={<Guarded permission="INVENTORY_VIEW"><InventoryHistoryPage /></Guarded>} />
+            <Route path="/inventory/shipments" element={<Guarded permission="INVENTORY_VIEW"><ShipmentsPage /></Guarded>} />
 
             {/* ── CRM ── */}
             <Route path="/clients" element={<Guarded permission="CLIENTS_VIEW"><ClientsPage /></Guarded>} />

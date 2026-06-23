@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Building2, Mail, Phone, Globe, MapPin,
   Edit2, Trash2, Plus, MoreVertical, FileText, CreditCard,
-  Users, Activity, BookOpen, AlertCircle, Loader2,
+  Users, Activity, BookOpen, AlertCircle, Loader2, Package,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
@@ -15,10 +15,11 @@ import TransactionForm from '../../components/clients/TransactionForm';
 import api from '../../lib/api';
 
 const TABS = [
-  { id: 'overview',  label: 'Overview',  icon: Building2 },
-  { id: 'contacts',  label: 'Contacts',  icon: Users },
-  { id: 'activity',  label: 'Activity',  icon: Activity },
-  { id: 'ledger',    label: 'Ledger',    icon: BookOpen },
+  { id: 'overview',  label: 'Overview',     icon: Building2 },
+  { id: 'contacts',  label: 'Contacts',     icon: Users },
+  { id: 'activity',  label: 'Activity',     icon: Activity },
+  { id: 'ledger',    label: 'Ledger',       icon: BookOpen },
+  { id: 'items',     label: 'Item History', icon: Package },
 ];
 
 function fmt(n) {
@@ -433,6 +434,124 @@ function LedgerTab({ client }) {
   );
 }
 
+/* ─── Item History Tab ─── */
+function ItemsTab({ client }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['client-items', client.id],
+    queryFn: () => api.get(`/clients/${client.id}/items`).then((r) => r.data),
+  });
+
+  const history = data?.history || [];
+  const summary = data?.summary || [];
+
+  const STATUS_CLASS = {
+    DELIVERED: 'bg-green-50 text-green-700',
+    CONFIRMED: 'bg-blue-50 text-blue-700',
+    DRAFT:     'bg-gray-100 text-gray-600',
+    CANCELLED: 'bg-red-50 text-red-700',
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-40">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (history.length === 0) {
+    return (
+      <div className="text-center py-16 border rounded-xl">
+        <Package className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+        <p className="font-medium">No items purchased yet</p>
+        <p className="text-sm text-muted-foreground mt-1">Items will appear here once this client has sales orders.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Summary by product */}
+      <div>
+        <h3 className="font-semibold text-sm mb-3">Purchased Items Summary</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {summary.map((s) => (
+            <div key={s.productId || s.name} className="border rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Package className="w-4 h-4 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-sm truncate">{s.name}</p>
+                  {s.sku && <p className="text-xs text-muted-foreground font-mono">{s.sku}</p>}
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-3 text-center">
+                <div>
+                  <p className="text-sm font-bold">{s.totalQuantity}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase">Qty</p>
+                </div>
+                <div>
+                  <p className="text-sm font-bold">{s.orders}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase">Orders</p>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-green-600">{fmt(s.totalSpent)}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase">Spent</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Full line-item history */}
+      <div>
+        <h3 className="font-semibold text-sm mb-3">Order Item History</h3>
+        <div className="border rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/40">
+              <tr>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Date</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Order</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Item</th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">Qty</th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">Unit Price</th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">Total</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {history.map((h) => (
+                <tr key={h.id} className="hover:bg-muted/20">
+                  <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{fmtDate(h.saleDate)}</td>
+                  <td className="px-4 py-3 text-xs font-mono">
+                    {h.saleId ? (
+                      <Link to={`/sales/orders`} className="text-primary hover:underline">{h.saleNumber}</Link>
+                    ) : h.saleNumber}
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="font-medium">{h.name}</p>
+                    {h.sku && <span className="text-xs text-muted-foreground font-mono">{h.sku}</span>}
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono">{h.quantity}{h.unitType ? <span className="text-xs text-muted-foreground ml-1">{h.unitType}</span> : null}</td>
+                  <td className="px-4 py-3 text-right">{fmt(h.unitPrice)}</td>
+                  <td className="px-4 py-3 text-right font-semibold">{fmt(h.total)}</td>
+                  <td className="px-4 py-3">
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${STATUS_CLASS[h.saleStatus] || 'bg-gray-100 text-gray-600'}`}>
+                      {h.saleStatus}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Main Page ─── */
 export default function ClientDetailPage() {
   const { id } = useParams();
@@ -543,6 +662,7 @@ export default function ClientDetailPage() {
       {activeTab === 'contacts'  && <ContactsTab client={client} />}
       {activeTab === 'activity'  && <ActivityTab client={client} />}
       {activeTab === 'ledger'    && <LedgerTab   client={client} />}
+      {activeTab === 'items'     && <ItemsTab    client={client} />}
 
       {/* Edit Dialog */}
       <Dialog open={showEdit} onOpenChange={setShowEdit}>

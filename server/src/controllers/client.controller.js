@@ -393,6 +393,51 @@ async function deleteTransaction(req, res) {
   res.json({ message: 'Transaction deleted' });
 }
 
+// ─── Item history (products this client has purchased via sales) ───────────────
+
+async function getClientItems(req, res) {
+  const clientId = Number(req.params.id);
+
+  const items = await prisma.saleItem.findMany({
+    where: { sale: { clientId } },
+    include: {
+      product: { select: { id: true, sku: true, name: true, unitType: true } },
+      sale: { select: { id: true, saleNumber: true, saleDate: true, status: true } },
+    },
+    orderBy: { sale: { saleDate: 'desc' } },
+  });
+
+  // Per-line history
+  const history = items.map((it) => ({
+    id: it.id,
+    productId: it.productId,
+    sku: it.product?.sku || null,
+    name: it.product?.name || it.description,
+    unitType: it.product?.unitType || null,
+    quantity: it.quantity,
+    unitPrice: it.unitPrice,
+    total: it.total,
+    saleNumber: it.sale?.saleNumber,
+    saleId: it.sale?.id,
+    saleDate: it.sale?.saleDate,
+    saleStatus: it.sale?.status,
+  }));
+
+  // Aggregate totals per product
+  const byProduct = {};
+  for (const h of history) {
+    const key = h.productId || `desc:${h.name}`;
+    if (!byProduct[key]) {
+      byProduct[key] = { productId: h.productId, sku: h.sku, name: h.name, unitType: h.unitType, totalQuantity: 0, totalSpent: 0, orders: 0 };
+    }
+    byProduct[key].totalQuantity += h.quantity;
+    byProduct[key].totalSpent += h.total;
+    byProduct[key].orders += 1;
+  }
+
+  res.json({ history, summary: Object.values(byProduct).sort((a, b) => b.totalSpent - a.totalSpent) });
+}
+
 // ─── Industries list ──────────────────────────────────────────────────────────
 
 async function getIndustries(req, res) {
@@ -411,5 +456,6 @@ module.exports = {
   getContacts, getAllContacts, createContact, updateContact, deleteContact,
   getNotes, createNote, deleteNote,
   getLedger, createTransaction, deleteTransaction,
+  getClientItems,
   getIndustries,
 };

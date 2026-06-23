@@ -50,6 +50,9 @@ router.post('/:id/notes',
 
 router.delete('/:id/notes/:noteId', authorize('CLIENTS_UPDATE'), ctrl.deleteNote);
 
+// ─── Item history ─────────────────────────────────────────────────────────────
+router.get('/:id/items', authorize('CLIENTS_VIEW'), ctrl.getClientItems);
+
 // ─── Ledger ───────────────────────────────────────────────────────────────────
 router.get('/:id/ledger', authorize('CLIENTS_VIEW'), ctrl.getLedger);
 

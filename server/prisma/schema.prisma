@@ -45,6 +45,7 @@ model User {
   documentVersions      DocumentVersion[]      @relation("VersionUploader")
   notifications         Notification[]         @relation("UserNotifications")
   auditLogs             AuditLog[]             @relation("AuditUser")
+  shipmentsCreated      Shipment[]             @relation("ShipmentCreator")
 
   @@map("users")
 }
@@ -135,6 +136,8 @@ model Warehouse {
   documents          Document[]
   approvalRequests   ApprovalRequest[]
   clientTransactions ClientTransaction[]
+  shipmentsOut       Shipment[]             @relation("ShipmentSource")
+  shipmentsIn        Shipment[]             @relation("ShipmentDest")
 
   @@map("warehouses")
 }
@@ -175,6 +178,7 @@ model Product {
   quotationItems QuotationItem[]
   poItems        POItem[]
   saleItems      SaleItem[]
+  shipmentItems  ShipmentItem[]
 
   @@map("products")
 }
@@ -786,6 +790,55 @@ model DocumentVersion {
   uploader    User     @relation("VersionUploader", fields: [uploadedBy], references: [id])
 
   @@map("document_versions")
+}
+
+// ─── Shipments (inter-warehouse transfers) ─────────────────────────────────────
+
+model Shipment {
+  id                Int            @id @default(autoincrement())
+  shipmentNumber    String         @unique
+  sourceWarehouseId Int
+  destWarehouseId   Int
+  status            ShipmentStatus @default(IN_PROCESS)
+  notes             String?
+  createdBy         Int
+  approvedBy        Int?
+  approvedAt        DateTime?
+  decisionNote      String?
+  receivedBy        Int?
+  receivedAt        DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  sourceWarehouse Warehouse      @relation("ShipmentSource", fields: [sourceWarehouseId], references: [id])
+  destWarehouse   Warehouse      @relation("ShipmentDest", fields: [destWarehouseId], references: [id])
+  createdByUser   User           @relation("ShipmentCreator", fields: [createdBy], references: [id])
+  items           ShipmentItem[]
+
+  @@map("shipments")
+}
+
+model ShipmentItem {
+  id          Int     @id @default(autoincrement())
+  shipmentId  Int
+  productId   Int
+  sku         String
+  description String
+  quantity    Float
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@map("shipment_items")
+}
+
+enum ShipmentStatus {
+  IN_PROCESS
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  RECEIVED
+  DECLINED
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────
