@@ -817,6 +817,7 @@ model Shipment {
   sourceWarehouseId Int
   destWarehouseId   Int
   status            ShipmentStatus @default(IN_PROCESS)
+  stockDeducted     Boolean        @default(false)
   notes             String?
   createdBy         Int
   approvedBy        Int?

@@ -34,6 +34,23 @@ async function nextShipmentNumber() {
 
 const LINK = '/inventory/shipments';
 
+// Return previously-deducted source stock (used on reject / decline)
+async function restoreSourceStock(tx, shipment, userId) {
+  for (const item of shipment.items) {
+    const p = await tx.product.findUnique({ where: { id: item.productId } });
+    if (!p) continue;
+    const newQty = p.quantity + item.quantity;
+    await tx.product.update({ where: { id: p.id }, data: { quantity: newQty } });
+    await tx.inventoryTransaction.create({
+      data: {
+        productId: p.id, type: 'STOCK_IN', quantity: item.quantity, balanceAfter: newQty,
+        reference: shipment.shipmentNumber, notes: `Shipment ${shipment.shipmentNumber} cancelled — stock returned`,
+        warehouseId: shipment.sourceWarehouseId, createdBy: userId,
+      },
+    });
+  }
+}
+
 // ─── List (incoming + outgoing for the active warehouse) ───────────────────────
 
 async function listShipments(req, res) {
@@ -133,22 +150,46 @@ async function submitShipment(req, res) {
   const id = Number(req.params.id);
   const shipment = await prisma.shipment.findUnique({
     where: { id },
-    include: { sourceWarehouse: true, destWarehouse: true },
+    include: { items: true, sourceWarehouse: true, destWarehouse: true },
   });
   if (!shipment) return res.status(404).json({ message: 'Shipment not found' });
   if (shipment.status !== 'IN_PROCESS') return res.status(400).json({ message: 'Only in-process shipments can be submitted.' });
 
-  const updated = await prisma.shipment.update({ where: { id }, data: { status: 'PENDING_APPROVAL' } });
+  let updated;
+  try {
+    updated = await prisma.$transaction(async (tx) => {
+      // Deduct stock from the source warehouse now (on submit)
+      for (const item of shipment.items) {
+        const p = await tx.product.findUnique({ where: { id: item.productId } });
+        if (!p) throw Object.assign(new Error(`Product missing for ${item.description}.`), { status: 400 });
+        if (p.quantity < item.quantity) {
+          throw Object.assign(new Error(`Insufficient stock for ${p.name} (have ${p.quantity}, need ${item.quantity}).`), { status: 400 });
+        }
+        const newQty = p.quantity - item.quantity;
+        await tx.product.update({ where: { id: p.id }, data: { quantity: newQty } });
+        await tx.inventoryTransaction.create({
+          data: {
+            productId: p.id, type: 'STOCK_OUT', quantity: item.quantity, balanceAfter: newQty,
+            reference: shipment.shipmentNumber, notes: `Shipment to ${shipment.destWarehouse.name} (submitted)`,
+            warehouseId: shipment.sourceWarehouseId, createdBy: req.user.id,
+          },
+        });
+      }
+      return tx.shipment.update({ where: { id }, data: { status: 'PENDING_APPROVAL', stockDeducted: true } });
+    });
+  } catch (err) {
+    return res.status(err.status || 500).json({ message: err.message || 'Failed to submit shipment' });
+  }
 
   const bosses = await getBossUserIds();
   await notify(bosses, {
     type: 'APPROVAL_REQUIRED',
     title: `Shipment ${shipment.shipmentNumber} needs approval`,
-    message: `${shipment.sourceWarehouse.name} → ${shipment.destWarehouse.name}. Review and approve the transfer.`,
+    message: `${shipment.sourceWarehouse.name} → ${shipment.destWarehouse.name}. Stock has been deducted from ${shipment.sourceWarehouse.name}; review and approve.`,
     link: LINK,
   });
 
-  logAudit({ userId: req.user.id, action: 'STATUS_CHANGE', module: 'INVENTORY', resourceId: id, resourceType: 'Shipment', newValues: { status: 'PENDING_APPROVAL' }, req });
+  logAudit({ userId: req.user.id, action: 'STATUS_CHANGE', module: 'INVENTORY', resourceId: id, resourceType: 'Shipment', newValues: { status: 'PENDING_APPROVAL', stockDeducted: true }, req });
   res.json(updated);
 }
 
@@ -186,19 +227,22 @@ async function approveShipment(req, res) {
 async function rejectShipment(req, res) {
   const id = Number(req.params.id);
   const { note } = req.body || {};
-  const shipment = await prisma.shipment.findUnique({ where: { id }, include: { destWarehouse: true } });
+  const shipment = await prisma.shipment.findUnique({ where: { id }, include: { items: true, sourceWarehouse: true, destWarehouse: true } });
   if (!shipment) return res.status(404).json({ message: 'Shipment not found' });
   if (shipment.status !== 'PENDING_APPROVAL') return res.status(400).json({ message: 'Shipment is not pending approval.' });
 
-  const updated = await prisma.shipment.update({
-    where: { id },
-    data: { status: 'REJECTED', approvedBy: req.user.id, approvedAt: new Date(), decisionNote: note || null },
+  const updated = await prisma.$transaction(async (tx) => {
+    if (shipment.stockDeducted) await restoreSourceStock(tx, shipment, req.user.id);
+    return tx.shipment.update({
+      where: { id },
+      data: { status: 'REJECTED', approvedBy: req.user.id, approvedAt: new Date(), decisionNote: note || null, stockDeducted: false },
+    });
   });
 
   await notify([shipment.createdBy], {
     type: 'APPROVAL_DECIDED',
     title: `Shipment ${shipment.shipmentNumber} rejected`,
-    message: `The transfer to ${shipment.destWarehouse.name} was rejected.${note ? ` Reason: ${note}` : ''}`,
+    message: `The transfer to ${shipment.destWarehouse.name} was rejected. Stock has been returned to ${shipment.sourceWarehouse.name}.${note ? ` Reason: ${note}` : ''}`,
     link: LINK,
   });
 
@@ -227,23 +271,12 @@ async function receiveShipment(req, res) {
 
   await prisma.$transaction(async (tx) => {
     for (const item of shipment.items) {
-      // 1) Source: deduct stock
+      // Source stock was already deducted at submit time. We only need the source
+      // product's details to match/clone the destination product.
       const srcProduct = await tx.product.findUnique({ where: { id: item.productId } });
       if (!srcProduct) throw Object.assign(new Error(`Source product missing for ${item.description}`), { status: 400 });
-      if (srcProduct.quantity < item.quantity) {
-        throw Object.assign(new Error(`Insufficient stock at source for ${srcProduct.name} (have ${srcProduct.quantity}, need ${item.quantity}).`), { status: 400 });
-      }
-      const srcNewQty = srcProduct.quantity - item.quantity;
-      await tx.product.update({ where: { id: srcProduct.id }, data: { quantity: srcNewQty } });
-      await tx.inventoryTransaction.create({
-        data: {
-          productId: srcProduct.id, type: 'STOCK_OUT', quantity: item.quantity, balanceAfter: srcNewQty,
-          reference: shipment.shipmentNumber, notes: `Transfer to ${shipment.destWarehouse.name}`,
-          warehouseId: sourceId, createdBy: req.user.id,
-        },
-      });
 
-      // 2) Destination: find matching product by name (scoped to dest via active context), else create
+      // Destination: find matching product by name (scoped to dest via active context), else create
       let destProduct = await tx.product.findFirst({
         where: { name: srcProduct.name, warehouseId: destId },
       });
@@ -298,23 +331,26 @@ async function receiveShipment(req, res) {
 async function declineShipment(req, res) {
   const id = Number(req.params.id);
   const { note } = req.body || {};
-  const shipment = await prisma.shipment.findUnique({ where: { id }, include: { sourceWarehouse: true, destWarehouse: true } });
+  const shipment = await prisma.shipment.findUnique({ where: { id }, include: { items: true, sourceWarehouse: true, destWarehouse: true } });
   if (!shipment) return res.status(404).json({ message: 'Shipment not found' });
   if (shipment.status !== 'APPROVED') return res.status(400).json({ message: 'Only approved shipments can be declined.' });
   if (req.warehouseId !== shipment.destWarehouseId) {
     return res.status(400).json({ message: `Switch to "${shipment.destWarehouse.name}" to act on this delivery.` });
   }
 
-  const updated = await prisma.shipment.update({
-    where: { id },
-    data: { status: 'DECLINED', receivedBy: req.user.id, receivedAt: new Date(), decisionNote: note || null },
+  const updated = await prisma.$transaction(async (tx) => {
+    if (shipment.stockDeducted) await restoreSourceStock(tx, shipment, req.user.id);
+    return tx.shipment.update({
+      where: { id },
+      data: { status: 'DECLINED', receivedBy: req.user.id, receivedAt: new Date(), decisionNote: note || null, stockDeducted: false },
+    });
   });
 
   const recipients = [...(await getBossUserIds()), shipment.createdBy];
   await notify(recipients, {
     type: 'WARNING',
     title: `Shipment ${shipment.shipmentNumber} declined`,
-    message: `${shipment.destWarehouse.name} declined the delivery. Stock at ${shipment.sourceWarehouse.name} is unchanged.`,
+    message: `${shipment.destWarehouse.name} declined the delivery. Stock has been returned to ${shipment.sourceWarehouse.name}.`,
     link: LINK,
   });
 
