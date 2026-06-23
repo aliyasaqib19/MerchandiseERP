@@ -20,7 +20,8 @@ export const useAuthStore = create(
       hasPermission: (permission) => {
         const state = useAuthStore.getState();
         // System Administrator always has full access to every module/action.
-        if (state.user?.role === 'System Administrator') return true;
+        const roles = state.user?.roles || (state.user?.role ? [state.user.role] : []);
+        if (roles.includes('System Administrator')) return true;
         return state.user?.permissions?.includes(permission) ?? false;
       },
     }),

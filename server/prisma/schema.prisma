@@ -22,6 +22,7 @@ model User {
   updatedAt     DateTime   @updatedAt
 
   role                  Role                   @relation(fields: [roleId], references: [id])
+  extraRoles            UserRole[]             // additional roles beyond the primary role (multi-role RBAC)
   branch                Branch?                @relation(fields: [branchId], references: [id])
   refreshTokens         RefreshToken[]
   inventoryTransactions InventoryTransaction[]
@@ -60,9 +61,21 @@ model Role {
   updatedAt   DateTime @updatedAt
 
   users           User[]
+  userRoles       UserRole[]
   rolePermissions RolePermission[]
 
   @@map("roles")
+}
+
+model UserRole {
+  userId Int
+  roleId Int
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
 }
 
 model Permission {

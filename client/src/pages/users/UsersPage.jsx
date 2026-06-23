@@ -94,7 +94,11 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{user.email}</td>
                   <td className="px-4 py-3">
-                    <Badge variant="outline">{user.role?.name}</Badge>
+                    <div className="flex flex-wrap gap-1">
+                      {(user.roles?.length ? user.roles : [user.role].filter(Boolean)).map((r) => (
+                        <Badge key={r.id} variant="outline">{r.name}</Badge>
+                      ))}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{user.branch?.name || '—'}</td>
                   <td className="px-4 py-3">

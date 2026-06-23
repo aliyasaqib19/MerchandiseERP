@@ -11,16 +11,12 @@ async function authenticate(req, res, next) {
 
   try {
     const decoded = verifyAccessToken(token);
+    const rolePermInclude = { rolePermissions: { include: { permission: true } } };
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
       include: {
-        role: {
-          include: {
-            rolePermissions: {
-              include: { permission: true },
-            },
-          },
-        },
+        role: { include: rolePermInclude },
+        extraRoles: { include: { role: { include: rolePermInclude } } },
       },
     });
 
@@ -28,13 +24,19 @@ async function authenticate(req, res, next) {
       return res.status(401).json({ message: 'User not found or inactive' });
     }
 
+    // Effective permissions & roles = union of the primary role and all extra roles.
+    const allRoles = [user.role, ...user.extraRoles.map((er) => er.role)];
+    const roleNames = [...new Set(allRoles.map((r) => r.name))];
+    const permissions = [...new Set(allRoles.flatMap((r) => r.rolePermissions.map((rp) => rp.permission.name)))];
+
     req.user = {
       id: user.id,
       email: user.email,
       roleId: user.roleId,
       roleName: user.role.name,
+      roleNames,
       warehouseIds: user.warehouseIds || [],
-      permissions: user.role.rolePermissions.map((rp) => rp.permission.name),
+      permissions,
     };
 
     // Strict warehouse access control: a user restricted to specific warehouses

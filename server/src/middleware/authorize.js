@@ -4,8 +4,8 @@ function authorize(...requiredPermissions) {
       return res.status(401).json({ message: 'Unauthenticated' });
     }
 
-    // System Administrator bypasses all permission checks.
-    if (req.user.roleName === 'System Administrator') {
+    // System Administrator bypasses all permission checks (in any assigned role).
+    if (req.user.roleName === 'System Administrator' || (req.user.roleNames || []).includes('System Administrator')) {
       return next();
     }
 

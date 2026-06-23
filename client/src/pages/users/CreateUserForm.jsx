@@ -20,7 +20,6 @@ const createSchema = z.object({
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
     .regex(passwordRegex, 'Must contain at least one uppercase letter and one special character'),
-  roleId: z.string().min(1, 'Role is required'),
   branchId: z.string().optional(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
 });
@@ -53,6 +52,21 @@ export default function CreateUserForm({ onSuccess, defaultValues, userId }) {
     );
   }
 
+  // Multi-role: a user can hold several roles; effective permissions are the union.
+  const initialRoleIds =
+    defaultValues?.roleIds?.length ? defaultValues.roleIds
+    : defaultValues?.role?.id ? [defaultValues.role.id]
+    : [];
+  const [roleIds, setRoleIds] = useState(initialRoleIds);
+  const [roleError, setRoleError] = useState('');
+
+  function toggleRole(id) {
+    setRoleError('');
+    setRoleIds((prev) =>
+      prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id]
+    );
+  }
+
   const {
     register,
     handleSubmit,
@@ -65,15 +79,18 @@ export default function CreateUserForm({ onSuccess, defaultValues, userId }) {
       email: defaultValues?.email || '',
       phone: defaultValues?.phone || '',
       password: '',
-      roleId: String(defaultValues?.role?.id || ''),
       branchId: String(defaultValues?.branch?.id || ''),
       status: defaultValues?.status || 'ACTIVE',
     },
   });
 
   async function onSubmit(values) {
+    if (roleIds.length === 0) {
+      setRoleError('Select at least one role');
+      return;
+    }
     try {
-      const base = { ...values, warehouseIds };
+      const base = { ...values, warehouseIds, roleIds };
       if (isEdit) {
         const payload = { ...base };
         if (!payload.password) delete payload.password;
@@ -126,18 +143,30 @@ export default function CreateUserForm({ onSuccess, defaultValues, userId }) {
           <p className="text-xs text-muted-foreground">Min 8 chars, one uppercase letter, one special character (e.g. Test@1234)</p>
         </div>
 
-        <div className="space-y-1.5">
-          <Label>Role</Label>
-          <Select {...register('roleId')}>
-            <option value="">Select role...</option>
+        <div className="space-y-1.5 col-span-2">
+          <Label>Roles <span className="text-muted-foreground text-xs">(assign one or more — permissions combine)</span></Label>
+          <div className="rounded-md border divide-y max-h-44 overflow-y-auto">
             {roles.map((r) => (
-              <option key={r.id} value={String(r.id)}>{r.name}</option>
+              <label key={r.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/40 text-sm">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={roleIds.includes(r.id)}
+                  onChange={() => toggleRole(r.id)}
+                />
+                <span>{r.name}</span>
+                {r.description && <span className="text-xs text-muted-foreground truncate">· {r.description}</span>}
+              </label>
             ))}
-          </Select>
-          {errors.roleId && <p className="text-xs text-destructive">{errors.roleId.message}</p>}
+            {roles.length === 0 && <p className="px-3 py-2 text-xs text-muted-foreground">No roles available</p>}
+          </div>
+          {roleError && <p className="text-xs text-destructive">{roleError}</p>}
+          {roleIds.length > 1 && (
+            <p className="text-xs text-muted-foreground">This user will have the combined access of {roleIds.length} roles.</p>
+          )}
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 col-span-2">
           <Label>Status</Label>
           <Select {...register('status')}>
             <option value="ACTIVE">Active</option>

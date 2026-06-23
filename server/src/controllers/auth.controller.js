@@ -4,20 +4,28 @@ const prisma = require('../utils/prisma');
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
 const { logAudit } = require('./audit.controller');
 
+const ROLE_PERM_INCLUDE = { rolePermissions: { include: { permission: true } } };
+const USER_ROLE_INCLUDE = {
+  role: { include: ROLE_PERM_INCLUDE },
+  extraRoles: { include: { role: { include: ROLE_PERM_INCLUDE } } },
+  branch: true,
+};
+
+// Build the effective role list + unioned permissions across primary + extra roles.
+function effectiveAccess(user) {
+  const allRoles = [user.role, ...(user.extraRoles || []).map((er) => er.role)];
+  return {
+    roles: [...new Set(allRoles.map((r) => r.name))],
+    permissions: [...new Set(allRoles.flatMap((r) => r.rolePermissions.map((rp) => rp.permission.name)))],
+  };
+}
+
 async function login(req, res) {
   const { email, password } = req.body;
 
   const user = await prisma.user.findUnique({
     where: { email },
-    include: {
-      role: {
-        include: {
-          rolePermissions: {
-            include: { permission: true },
-          },
-        },
-      },
-    },
+    include: USER_ROLE_INCLUDE,
   });
 
   if (!user) {
@@ -33,7 +41,7 @@ async function login(req, res) {
     return res.status(401).json({ message: 'Invalid email or password' });
   }
 
-  const permissions = user.role.rolePermissions.map((rp) => rp.permission.name);
+  const { roles, permissions } = effectiveAccess(user);
 
   const accessToken = signAccessToken({ userId: user.id, roleId: user.roleId });
   const refreshToken = signRefreshToken({ userId: user.id });
@@ -54,6 +62,7 @@ async function login(req, res) {
       fullName: user.fullName,
       email: user.email,
       role: user.role.name,
+      roles,
       permissions,
     },
   });
@@ -122,15 +131,10 @@ async function forgotPassword(req, res) {
 async function me(req, res) {
   const user = await prisma.user.findUnique({
     where: { id: req.user.id },
-    include: {
-      role: {
-        include: {
-          rolePermissions: { include: { permission: true } },
-        },
-      },
-      branch: true,
-    },
+    include: USER_ROLE_INCLUDE,
   });
+
+  const { roles, permissions } = effectiveAccess(user);
 
   res.json({
     id: user.id,
@@ -139,8 +143,9 @@ async function me(req, res) {
     phone: user.phone,
     status: user.status,
     role: user.role.name,
+    roles,
     branch: user.branch?.name || null,
-    permissions: user.role.rolePermissions.map((rp) => rp.permission.name),
+    permissions,
   });
 }
 
