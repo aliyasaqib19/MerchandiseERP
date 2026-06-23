@@ -148,7 +148,7 @@ async function getProduct(req, res) {
 }
 
 async function createProduct(req, res) {
-  const { sku, name, description, categoryId, brandId, unitType, quantity, minThreshold, costPrice, sellingPrice, status } = req.body;
+  const { sku, name, description, categoryId, brandId, unitType, quantity, minThreshold, costPrice, sellingPrice, status, imageUrl } = req.body;
 
   const exists = await prisma.product.findUnique({ where: { sku } });
   if (exists) return res.status(409).json({ message: 'SKU already exists' });
@@ -169,6 +169,7 @@ async function createProduct(req, res) {
         costPrice: costPrice ? Number(costPrice) : null,
         sellingPrice: sellingPrice ? Number(sellingPrice) : null,
         status: status || 'ACTIVE',
+        imageUrl: imageUrl || null,
       },
       include: { category: { select: { id: true, name: true } }, brand: { select: { id: true, name: true } } },
     });
@@ -195,7 +196,7 @@ async function createProduct(req, res) {
 }
 
 async function updateProduct(req, res) {
-  const { name, description, categoryId, brandId, unitType, minThreshold, costPrice, sellingPrice, status } = req.body;
+  const { name, description, categoryId, brandId, unitType, minThreshold, costPrice, sellingPrice, status, imageUrl } = req.body;
 
   const product = await prisma.product.update({
     where: { id: Number(req.params.id) },
@@ -209,6 +210,7 @@ async function updateProduct(req, res) {
       costPrice: costPrice !== undefined ? (costPrice ? Number(costPrice) : null) : undefined,
       sellingPrice: sellingPrice !== undefined ? (sellingPrice ? Number(sellingPrice) : null) : undefined,
       status,
+      imageUrl: imageUrl !== undefined ? (imageUrl || null) : undefined,
     },
     include: { category: { select: { id: true, name: true } }, brand: { select: { id: true, name: true } } },
   });

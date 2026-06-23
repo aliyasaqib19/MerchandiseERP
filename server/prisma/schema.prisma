@@ -180,6 +180,7 @@ model Product {
   costPrice     Float?
   sellingPrice  Float?
   status        ProductStatus @default(ACTIVE)
+  imageUrl      String?
   warehouseId   Int?
   brandId       Int?
   createdAt     DateTime      @default(now())

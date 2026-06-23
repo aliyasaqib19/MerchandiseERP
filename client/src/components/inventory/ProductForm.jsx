@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ImagePlus, X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -30,8 +31,20 @@ const schema = z.object({
 
 const UNIT_TYPES = ['PIECE', 'METER', 'KG', 'LITER', 'BOX', 'ROLL', 'SET'];
 
-export default function ProductForm({ onSuccess, defaultValues, productId }) {
+export default function ProductForm({ onSuccess, defaultValues, productId, lockBrand }) {
   const isEdit = !!productId;
+  const [image, setImage] = useState(defaultValues?.imageUrl || '');
+  const [imageError, setImageError] = useState('');
+
+  function onImageChange(e) {
+    const file = e.target.files?.[0];
+    setImageError('');
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { setImageError('Image must be under 5 MB.'); return; }
+    const reader = new FileReader();
+    reader.onload = () => setImage(reader.result);
+    reader.readAsDataURL(file);
+  }
 
   const { data: categories = [] } = useQuery({
     queryKey: ['inventory-categories'],
@@ -72,6 +85,7 @@ export default function ProductForm({ onSuccess, defaultValues, productId }) {
         brandId: values.brandId ? Number(values.brandId) : null,
         costPrice: values.costPrice === '' ? null : Number(values.costPrice),
         sellingPrice: values.sellingPrice === '' ? null : Number(values.sellingPrice),
+        imageUrl: image || null,
       };
 
       if (isEdit) {
@@ -131,10 +145,37 @@ export default function ProductForm({ onSuccess, defaultValues, productId }) {
           />
         </div>
 
+        {/* Product image */}
+        <div className="col-span-2 space-y-1.5">
+          <Label>Product Image <span className="text-muted-foreground text-xs">(optional)</span></Label>
+          <div className="flex items-center gap-3">
+            {image ? (
+              <div className="relative w-20 h-20 rounded-lg border overflow-hidden flex-shrink-0">
+                <img src={image} alt="product" className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setImage('')}
+                  className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <label className="w-20 h-20 rounded-lg border border-dashed flex flex-col items-center justify-center cursor-pointer hover:bg-muted/40 text-muted-foreground flex-shrink-0">
+                <ImagePlus className="w-5 h-5" />
+                <span className="text-[10px] mt-1">Upload</span>
+                <input type="file" accept="image/*" className="hidden" onChange={onImageChange} />
+              </label>
+            )}
+            <p className="text-xs text-muted-foreground">PNG/JPG, max 5 MB</p>
+          </div>
+          {imageError && <p className="text-xs text-destructive">{imageError}</p>}
+        </div>
+
         {/* Brand */}
         <div className="space-y-1.5">
           <Label>Brand <span className="text-muted-foreground text-xs">(optional)</span></Label>
-          <Select {...register('brandId')}>
+          <Select {...register('brandId')} disabled={lockBrand}>
             <option value="">No brand</option>
             {brands.map((b) => (
               <option key={b.id} value={String(b.id)}>{b.name}</option>

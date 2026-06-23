@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Tag, Package, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, Tag, Package, ArrowRight, Loader2, AlertCircle, Plus } from 'lucide-react';
 import { Button } from '../../components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import ProductForm from '../../components/inventory/ProductForm';
 import api from '../../lib/api';
 
 function money(n) {
@@ -10,6 +13,8 @@ function money(n) {
 
 export default function BrandDetailPage() {
   const { id } = useParams();
+  const queryClient = useQueryClient();
+  const [showAdd, setShowAdd] = useState(false);
 
   const { data: brand } = useQuery({
     queryKey: ['brand', id],
@@ -21,20 +26,32 @@ export default function BrandDetailPage() {
     queryFn: () => api.get(`/brands/${id}/products`).then((r) => r.data),
   });
 
+  function onAdded() {
+    setShowAdd(false);
+    queryClient.invalidateQueries({ queryKey: ['brand-products', id] });
+    queryClient.invalidateQueries({ queryKey: ['brands'] });
+    queryClient.invalidateQueries({ queryKey: ['inventory-products'] });
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-5">
       <Link to="/inventory/brands" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="w-4 h-4" /> Back to Brands
       </Link>
 
-      <div className="flex items-center gap-4">
-        <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
-          <Tag className="w-7 h-7 text-primary" />
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Tag className="w-7 h-7 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">{brand?.name || '...'}</h1>
+            <p className="text-muted-foreground text-sm mt-0.5">{products.length} product{products.length !== 1 ? 's' : ''} in this warehouse</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold">{brand?.name || '...'}</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{products.length} product{products.length !== 1 ? 's' : ''} across all warehouses</p>
-        </div>
+        <Button onClick={() => setShowAdd(true)}>
+          <Plus className="w-4 h-4" /> Add Product
+        </Button>
       </div>
 
       {isLoading ? (
@@ -43,13 +60,15 @@ export default function BrandDetailPage() {
         <div className="text-center py-16 border rounded-xl">
           <AlertCircle className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
           <p className="font-medium">No products for this brand yet</p>
-          <p className="text-sm text-muted-foreground mt-1">Add products and assign them to this brand.</p>
+          <p className="text-sm text-muted-foreground mt-1">Add a product to this brand for the current warehouse.</p>
+          <Button className="mt-4" onClick={() => setShowAdd(true)}><Plus className="w-4 h-4" /> Add Product</Button>
         </div>
       ) : (
         <div className="border rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-muted/40">
               <tr>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground w-12"></th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Product</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Model No.</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Warehouse</th>
@@ -61,6 +80,13 @@ export default function BrandDetailPage() {
             <tbody className="divide-y">
               {products.map((p) => (
                 <tr key={p.id} className="hover:bg-muted/20">
+                  <td className="px-4 py-3">
+                    {p.imageUrl ? (
+                      <img src={p.imageUrl} alt={p.name} className="w-9 h-9 rounded-md object-cover border" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-md bg-muted flex items-center justify-center"><Package className="w-4 h-4 text-muted-foreground" /></div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 font-medium">{p.name}</td>
                   <td className="px-4 py-3 font-mono text-xs">{p.sku}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{p.warehouse?.name || '—'}</td>
@@ -79,6 +105,19 @@ export default function BrandDetailPage() {
           </table>
         </div>
       )}
+
+      <Dialog open={showAdd} onOpenChange={setShowAdd}>
+        <DialogContent className="max-w-2xl" onClose={() => setShowAdd(false)}>
+          <DialogHeader><DialogTitle>Add Product to {brand?.name}</DialogTitle></DialogHeader>
+          {brand && (
+            <ProductForm
+              defaultValues={{ brand: { id: brand.id, name: brand.name } }}
+              lockBrand
+              onSuccess={onAdded}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

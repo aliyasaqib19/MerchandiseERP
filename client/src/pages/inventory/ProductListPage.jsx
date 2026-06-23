@@ -231,7 +231,16 @@ export default function ProductListPage() {
                     <td className="px-4 py-3">
                       <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{product.sku}</span>
                     </td>
-                    <td className="px-4 py-3 font-medium">{product.name}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5">
+                        {product.imageUrl ? (
+                          <img src={product.imageUrl} alt={product.name} className="w-9 h-9 rounded-md object-cover border flex-shrink-0" />
+                        ) : (
+                          <div className="w-9 h-9 rounded-md bg-muted flex items-center justify-center flex-shrink-0"><Package className="w-4 h-4 text-muted-foreground" /></div>
+                        )}
+                        <span className="font-medium">{product.name}</span>
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       {product.brand?.name
                         ? <Badge variant="outline" className="text-xs">{product.brand.name}</Badge>
