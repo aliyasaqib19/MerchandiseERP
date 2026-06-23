@@ -1,17 +1,26 @@
 const prisma = require('../utils/prisma');
+const db = prisma.base; // unscoped — we apply warehouse rules explicitly below
 const { logAudit } = require('./audit.controller');
+
+// Show approvals for the active warehouse, plus global ones and ALL shipment
+// approvals (a shipment is a cross-warehouse boss action).
+function warehouseScope(req) {
+  const wid = req.warehouseId;
+  if (!wid) return {};
+  return { OR: [{ warehouseId: wid }, { warehouseId: null }, { referenceType: 'Shipment' }] };
+}
 
 async function listApprovals(req, res, next) {
   try {
     const { status, type, page = 1, limit = 20, mine } = req.query;
-    const where = {};
+    const where = { ...warehouseScope(req) };
     if (status) where.status = status;
     if (type)   where.type   = type;
     if (mine === 'true') where.requestedBy = req.user.id;
 
     const [total, items] = await Promise.all([
-      prisma.approvalRequest.count({ where }),
-      prisma.approvalRequest.findMany({
+      db.approvalRequest.count({ where }),
+      db.approvalRequest.findMany({
         where,
         include: {
           requester: { select: { id: true, fullName: true, email: true } },
@@ -29,11 +38,12 @@ async function listApprovals(req, res, next) {
 
 async function getStats(req, res, next) {
   try {
+    const scope = warehouseScope(req);
     const [pending, approved, rejected, byType] = await Promise.all([
-      prisma.approvalRequest.count({ where: { status: 'PENDING' } }),
-      prisma.approvalRequest.count({ where: { status: 'APPROVED' } }),
-      prisma.approvalRequest.count({ where: { status: 'REJECTED' } }),
-      prisma.approvalRequest.groupBy({ by: ['type'], _count: { id: true }, where: { status: 'PENDING' } }),
+      db.approvalRequest.count({ where: { ...scope, status: 'PENDING' } }),
+      db.approvalRequest.count({ where: { ...scope, status: 'APPROVED' } }),
+      db.approvalRequest.count({ where: { ...scope, status: 'REJECTED' } }),
+      db.approvalRequest.groupBy({ by: ['type'], _count: { id: true }, where: { ...scope, status: 'PENDING' } }),
     ]);
     res.json({ pending, approved, rejected, byType });
   } catch (err) { next(err); }
