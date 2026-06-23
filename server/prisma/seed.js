@@ -171,7 +171,7 @@ async function main() {
 
   const bossRole = await ensureRole('Boss', 'Approves shipments and reviews requests');
   await assignPerms(bossRole, [
-    'INVENTORY_VIEW', 'SHIPMENTS_VIEW', 'SHIPMENTS_APPROVE',
+    'INVENTORY_VIEW', 'SHIPMENTS_VIEW', 'SHIPMENTS_APPROVE', 'SHIPMENTS_RECEIVE',
     'APPROVALS_VIEW', 'APPROVALS_APPROVE', 'CLIENTS_VIEW', 'SALES_VIEW',
     'REPORTS_VIEW', 'AUDIT_VIEW', 'NOTIFICATIONS_VIEW',
   ]);
@@ -179,7 +179,7 @@ async function main() {
   const inventoryManagerRole = await ensureRole('Inventory Manager', 'Creates shipments and adds shipment details');
   await assignPerms(inventoryManagerRole, [
     'INVENTORY_VIEW', 'INVENTORY_CREATE', 'INVENTORY_UPDATE', 'INVENTORY_EXPORT',
-    'SHIPMENTS_VIEW', 'SHIPMENTS_CREATE', 'CLIENTS_VIEW', 'NOTIFICATIONS_VIEW',
+    'SHIPMENTS_VIEW', 'SHIPMENTS_CREATE', 'SHIPMENTS_RECEIVE', 'CLIENTS_VIEW', 'NOTIFICATIONS_VIEW',
   ]);
 
   const warehouseStaffRole = await ensureRole('Warehouse Staff', 'Receives incoming shipments at the destination warehouse');
