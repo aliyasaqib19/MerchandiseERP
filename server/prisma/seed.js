@@ -13,6 +13,11 @@ const PERMISSIONS = [
   { name: 'INVENTORY_UPDATE', displayName: 'Edit Inventory',   module: 'INVENTORY', action: 'UPDATE' },
   { name: 'INVENTORY_DELETE', displayName: 'Delete Inventory', module: 'INVENTORY', action: 'DELETE' },
   { name: 'INVENTORY_EXPORT', displayName: 'Export Inventory', module: 'INVENTORY', action: 'EXPORT' },
+  // Shipments
+  { name: 'SHIPMENTS_VIEW',    displayName: 'View Shipments',           module: 'INVENTORY', action: 'VIEW' },
+  { name: 'SHIPMENTS_CREATE',  displayName: 'Create Shipment & Details', module: 'INVENTORY', action: 'CREATE' },
+  { name: 'SHIPMENTS_APPROVE', displayName: 'Approve/Decline Shipment',  module: 'INVENTORY', action: 'APPROVE' },
+  { name: 'SHIPMENTS_RECEIVE', displayName: 'Receive Shipment',          module: 'INVENTORY', action: 'UPDATE' },
   // Clients
   { name: 'CLIENTS_VIEW',   displayName: 'View Clients',   module: 'CLIENTS', action: 'VIEW' },
   { name: 'CLIENTS_CREATE', displayName: 'Add Clients',    module: 'CLIENTS', action: 'CREATE' },
@@ -145,6 +150,42 @@ async function main() {
       isSystem: true,
     },
   });
+
+  // ── Shipment workflow roles ───────────────────────────────────────────────
+  console.log('Seeding shipment workflow roles...');
+  async function ensureRole(name, description) {
+    return prisma.role.upsert({ where: { name }, update: {}, create: { name, description, isSystem: true } });
+  }
+  async function assignPerms(role, permNames) {
+    for (const permName of permNames) {
+      const perm = await prisma.permission.findUnique({ where: { name: permName } });
+      if (perm) {
+        await prisma.rolePermission.upsert({
+          where: { roleId_permissionId: { roleId: role.id, permissionId: perm.id } },
+          update: {},
+          create: { roleId: role.id, permissionId: perm.id },
+        });
+      }
+    }
+  }
+
+  const bossRole = await ensureRole('Boss', 'Approves shipments and reviews requests');
+  await assignPerms(bossRole, [
+    'INVENTORY_VIEW', 'SHIPMENTS_VIEW', 'SHIPMENTS_APPROVE',
+    'APPROVALS_VIEW', 'APPROVALS_APPROVE', 'CLIENTS_VIEW', 'SALES_VIEW',
+    'REPORTS_VIEW', 'AUDIT_VIEW', 'NOTIFICATIONS_VIEW',
+  ]);
+
+  const inventoryManagerRole = await ensureRole('Inventory Manager', 'Creates shipments and adds shipment details');
+  await assignPerms(inventoryManagerRole, [
+    'INVENTORY_VIEW', 'INVENTORY_CREATE', 'INVENTORY_UPDATE', 'INVENTORY_EXPORT',
+    'SHIPMENTS_VIEW', 'SHIPMENTS_CREATE', 'CLIENTS_VIEW', 'NOTIFICATIONS_VIEW',
+  ]);
+
+  const warehouseStaffRole = await ensureRole('Warehouse Staff', 'Receives incoming shipments at the destination warehouse');
+  await assignPerms(warehouseStaffRole, [
+    'INVENTORY_VIEW', 'SHIPMENTS_VIEW', 'SHIPMENTS_RECEIVE', 'NOTIFICATIONS_VIEW',
+  ]);
 
   console.log('Seeding default branch...');
   const branch = await prisma.branch.upsert({
@@ -425,6 +466,24 @@ async function main() {
     where: { email: 'tech@inventoria.com' },
     update: {},
     create: { fullName: 'Usman Khan', email: 'tech@inventoria.com', passwordHash: techHash, branchId: branch.id, roleId: techRole?.id || adminRole.id, status: 'ACTIVE' },
+  });
+
+  // ── Shipment workflow demo users ──────────────────────────────────────────
+  console.log('Seeding shipment workflow users...');
+  await prisma.user.upsert({
+    where: { email: 'boss@inventoria.com' },
+    update: { roleId: bossRole.id },
+    create: { fullName: 'Boss (Approver)', email: 'boss@inventoria.com', passwordHash: await bcrypt.hash('Boss@12345', 12), branchId: branch.id, roleId: bossRole.id, status: 'ACTIVE' },
+  });
+  await prisma.user.upsert({
+    where: { email: 'manager@inventoria.com' },
+    update: { roleId: inventoryManagerRole.id },
+    create: { fullName: 'Imran (Inventory Manager)', email: 'manager@inventoria.com', passwordHash: await bcrypt.hash('Manager@12345', 12), branchId: branch.id, roleId: inventoryManagerRole.id, status: 'ACTIVE' },
+  });
+  await prisma.user.upsert({
+    where: { email: 'saboor@inventoria.com' },
+    update: { roleId: warehouseStaffRole.id },
+    create: { fullName: 'Saboor (Lahore)', email: 'saboor@inventoria.com', passwordHash: await bcrypt.hash('Saboor@12345', 12), branchId: branch.id, roleId: warehouseStaffRole.id, status: 'ACTIVE' },
   });
 
   // ── Quotations ─────────────────────────────────────────────────────────────
@@ -845,11 +904,12 @@ async function main() {
     skuMap[sku] = await prisma.product.findFirst({ where: { sku } });
   }
 
-  async function seedShipment({ number, sourceId, destId, status, notes, items, decided, received }) {
+  async function seedShipment({ number, sourceId, destId, status, notes, items, decided, received, consignmentNumber }) {
     if (await prisma.shipment.findFirst({ where: { shipmentNumber: number } })) return;
-    await prisma.shipment.create({
+    const created = await prisma.shipment.create({
       data: {
         shipmentNumber: number,
+        consignmentNumber: consignmentNumber || null,
         sourceWarehouseId: sourceId,
         destWarehouseId: destId,
         status,
@@ -871,16 +931,29 @@ async function main() {
             })),
         },
       },
+      include: { sourceWarehouse: true, destWarehouse: true, items: true },
     });
+
+    // Pending shipments get a linked Approval Workflow request so the Boss can act
+    if (status === 'PENDING_APPROVAL') {
+      await prisma.approvalRequest.create({
+        data: {
+          type: 'SHIPMENT', status: 'PENDING', priority: 'HIGH',
+          title: `Shipment ${number}`,
+          description: `${created.sourceWarehouse.name} → ${created.destWarehouse.name} · ${created.items.length} item(s)`,
+          referenceType: 'Shipment', referenceId: created.id, requestedBy: salesUser.id,
+        },
+      });
+    }
   }
 
   const year2 = new Date().getFullYear();
 
-  // 1) Draft at Karachi, ready to submit for approval
+  // 1) Newly created at Karachi, waiting for the Boss to approve
   await seedShipment({
     number: `SHP-${year2}-0001`,
     sourceId: warehouseKarachi.id, destId: warehouseLahore.id,
-    status: 'IN_PROCESS',
+    status: 'PENDING_APPROVAL',
     notes: 'Cat6 cable restock for Lahore site work',
     items: [{ product: skuMap['CAB-UTP-CAT6-305'], quantity: 5 }],
   });

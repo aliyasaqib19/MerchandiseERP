@@ -246,6 +246,9 @@ function DecideDialog({ item, preset, onDone, onClose }) {
 export default function ApprovalsPage() {
   const qc = useQueryClient();
   const { user } = useAuthStore();
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const canApproveShipments = hasPermission('SHIPMENTS_APPROVE');
+  const canApproveGeneric = hasPermission('APPROVALS_APPROVE');
   const [statusFilter, setStatusFilter] = useState('PENDING');
   const [showCreate, setShowCreate] = useState(false);
   const [deciding, setDeciding]     = useState(null); // { item, decision }
@@ -369,16 +372,23 @@ export default function ApprovalsPage() {
                     <td className="px-4 py-3 text-muted-foreground">{fmt(item.dueDate)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
-                        {item.status === 'PENDING' && (
-                          <>
-                            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setDeciding({ item, decision: 'APPROVED' })}>
-                              <CheckCircle className="w-3.5 h-3.5" /> Approve
-                            </Button>
-                            <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => setDeciding({ item, decision: 'REJECTED' })}>
-                              <XCircle className="w-3.5 h-3.5" /> Reject
-                            </Button>
-                          </>
-                        )}
+                        {item.status === 'PENDING' && (() => {
+                          const isShipment = item.referenceType === 'Shipment';
+                          const allowed = isShipment ? canApproveShipments : canApproveGeneric;
+                          if (!allowed) {
+                            return <span className="text-xs text-muted-foreground">{isShipment ? 'Boss approval required' : 'Awaiting approval'}</span>;
+                          }
+                          return (
+                            <>
+                              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setDeciding({ item, decision: 'APPROVED' })}>
+                                <CheckCircle className="w-3.5 h-3.5" /> Approve
+                              </Button>
+                              <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => setDeciding({ item, decision: 'REJECTED' })}>
+                                <XCircle className="w-3.5 h-3.5" /> Reject
+                              </Button>
+                            </>
+                          );
+                        })()}
                         {(item.status === 'REJECTED' || item.status === 'CANCELLED') && (
                           <Button size="sm" variant="outline" onClick={() => setEditing(item)}>
                             <Pencil className="w-3.5 h-3.5" /> Edit & Resubmit
