@@ -33,7 +33,7 @@ export default function BrandDetailPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold">{brand?.name || '...'}</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{products.length} product{products.length !== 1 ? 's' : ''} in this warehouse</p>
+          <p className="text-muted-foreground text-sm mt-0.5">{products.length} product{products.length !== 1 ? 's' : ''} across all warehouses</p>
         </div>
       </div>
 
@@ -42,8 +42,8 @@ export default function BrandDetailPage() {
       ) : products.length === 0 ? (
         <div className="text-center py-16 border rounded-xl">
           <AlertCircle className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-          <p className="font-medium">No products for this brand in this warehouse</p>
-          <p className="text-sm text-muted-foreground mt-1">Switch warehouse or add products under this brand.</p>
+          <p className="font-medium">No products for this brand yet</p>
+          <p className="text-sm text-muted-foreground mt-1">Add products and assign them to this brand.</p>
         </div>
       ) : (
         <div className="border rounded-xl overflow-hidden">
@@ -52,7 +52,7 @@ export default function BrandDetailPage() {
               <tr>
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Product</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Model No.</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Category</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Warehouse</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">In Stock</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">Price</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground"></th>
@@ -63,7 +63,7 @@ export default function BrandDetailPage() {
                 <tr key={p.id} className="hover:bg-muted/20">
                   <td className="px-4 py-3 font-medium">{p.name}</td>
                   <td className="px-4 py-3 font-mono text-xs">{p.sku}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{p.category?.name || '—'}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{p.warehouse?.name || '—'}</td>
                   <td className="px-4 py-3 text-right font-mono">{p.quantity}<span className="text-xs text-muted-foreground ml-1">{p.unitType}</span></td>
                   <td className="px-4 py-3 text-right">{p.sellingPrice != null ? money(p.sellingPrice) : '—'}</td>
                   <td className="px-4 py-3 text-right">

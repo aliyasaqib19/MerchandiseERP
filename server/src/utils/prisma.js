@@ -71,4 +71,8 @@ const prisma = basePrisma.$extends({
   },
 });
 
+// Expose the raw (unscoped) client for queries that must ignore the active
+// warehouse — e.g. the company-wide brand catalog.
+prisma.base = basePrisma;
+
 module.exports = prisma;

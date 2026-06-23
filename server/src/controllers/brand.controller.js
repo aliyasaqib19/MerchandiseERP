@@ -1,13 +1,17 @@
 const prisma = require('../utils/prisma');
 const { logAudit } = require('./audit.controller');
 
+// Brand catalog is company-wide — use the unscoped client so products/distribution
+// are not filtered by the active warehouse.
+const db = prisma.base;
+
 // ─── List brands (with product count scoped to the active warehouse) ───────────
 
 async function listBrands(req, res) {
   const brands = await prisma.brand.findMany({ orderBy: { name: 'asc' } });
 
-  // Product counts + total units, scoped to the active warehouse via the extension
-  const grouped = await prisma.product.groupBy({
+  // Company-wide product counts + total units (across all warehouses)
+  const grouped = await db.product.groupBy({
     by: ['brandId'],
     where: { brandId: { not: null }, status: 'ACTIVE' },
     _count: { _all: true },
@@ -36,9 +40,12 @@ async function getBrand(req, res) {
 
 async function getBrandProducts(req, res) {
   const id = Number(req.params.id);
-  const products = await prisma.product.findMany({
+  const products = await db.product.findMany({
     where: { brandId: id },
-    include: { category: { select: { id: true, name: true } } },
+    include: {
+      category: { select: { id: true, name: true } },
+      warehouse: { select: { id: true, name: true } },
+    },
     orderBy: { name: 'asc' },
   });
   res.json(products);
@@ -49,13 +56,13 @@ async function getBrandProducts(req, res) {
 async function getProductDistribution(req, res) {
   const productId = Number(req.params.productId);
 
-  const product = await prisma.product.findUnique({
+  const product = await db.product.findUnique({
     where: { id: productId },
     include: { category: { select: { name: true } }, brand: { select: { id: true, name: true } } },
   });
   if (!product) return res.status(404).json({ message: 'Product not found' });
 
-  const saleItems = await prisma.saleItem.findMany({
+  const saleItems = await db.saleItem.findMany({
     where: { productId },
     include: {
       sale: {

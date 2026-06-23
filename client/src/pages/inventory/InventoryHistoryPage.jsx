@@ -50,11 +50,12 @@ export default function InventoryHistoryPage() {
 
   function exportCSV() {
     const rows = [
-      ['Date', 'Product', 'SKU', 'Type', 'Quantity', 'Balance After', 'Reference', 'Notes', 'Created By'],
+      ['Date', 'Product', 'Manufacture No.', 'Brand', 'Type', 'Quantity', 'Balance After', 'Reference', 'Notes', 'Created By'],
       ...filtered.map((tx) => [
         new Date(tx.createdAt).toLocaleString(),
         tx.product?.name || '',
         tx.product?.sku || '',
+        tx.product?.brand?.name || '',
         tx.type,
         tx.quantity,
         tx.balanceAfter,
@@ -146,6 +147,7 @@ export default function InventoryHistoryPage() {
               <tr>
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Date & Time</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Product</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Brand</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Type</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">Qty Change</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">Balance After</th>
@@ -158,7 +160,7 @@ export default function InventoryHistoryPage() {
               {isLoading ? (
                 [...Array(8)].map((_, i) => (
                   <tr key={i}>
-                    {[...Array(8)].map((_, j) => (
+                    {[...Array(9)].map((_, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="h-4 bg-muted animate-pulse rounded" />
                       </td>
@@ -167,7 +169,7 @@ export default function InventoryHistoryPage() {
                 ))
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-10 text-muted-foreground">
+                  <td colSpan={9} className="text-center py-10 text-muted-foreground">
                     No transactions found
                   </td>
                 </tr>
@@ -187,6 +189,7 @@ export default function InventoryHistoryPage() {
                       <p className="font-medium">{tx.product.name}</p>
                       <span className="font-mono text-xs text-muted-foreground">{tx.product.sku}</span>
                     </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{tx.product?.brand?.name || '—'}</td>
                     <td className="px-4 py-3"><TransactionTypeBadge type={tx.type} /></td>
                     <td className="px-4 py-3 text-right font-mono font-semibold">
                       <span className={

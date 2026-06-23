@@ -374,7 +374,12 @@ async function getTransactions(req, res) {
     prisma.inventoryTransaction.findMany({
       where,
       include: {
-        product: { select: { id: true, sku: true, name: true, unitType: true } },
+        product: {
+          select: {
+            id: true, sku: true, name: true, unitType: true,
+            brand: { select: { id: true, name: true } },
+          },
+        },
         user: { select: { id: true, fullName: true } },
       },
       orderBy: { createdAt: 'desc' },
