@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   CheckCircle, XCircle, Clock, AlertTriangle, Plus, ChevronDown,
-  Loader2, FileText, RefreshCw, Pencil,
+  Loader2, FileText, RefreshCw, Pencil, X, Package, ArrowRight,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -181,6 +181,123 @@ function EditDialog({ item, onDone, onClose }) {
   );
 }
 
+function Row({ label, value }) {
+  return (
+    <div className="flex justify-between gap-4 py-1.5 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium text-right">{value ?? '—'}</span>
+    </div>
+  );
+}
+
+function DetailsDialog({ item, onClose }) {
+  const isShipment = item.referenceType === 'Shipment' && item.referenceId;
+  const sc = STATUS_CFG[item.status] || STATUS_CFG.PENDING;
+  const pc = PRIORITY_CFG[item.priority] || PRIORITY_CFG.NORMAL;
+
+  const { data: shipment, isLoading } = useQuery({
+    queryKey: ['shipment-detail', item.referenceId],
+    queryFn: () => api.get(`/shipments/${item.referenceId}`).then((r) => r.data),
+    enabled: !!isShipment,
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white">
+          <div>
+            <h2 className="text-lg font-bold">{item.title}</h2>
+            <p className="text-xs text-muted-foreground">{item.type.replace(/_/g, ' ')}</p>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-5 h-5" /></button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {/* Summary */}
+          <div className="grid sm:grid-cols-2 gap-x-8 gap-y-0">
+            <Row label="Status" value={<span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sc.cls}`}>{sc.label}</span>} />
+            <Row label="Priority" value={<span className={`text-xs px-2 py-0.5 rounded-full font-medium ${pc.cls}`}>{pc.label}</span>} />
+            <Row label="Requested By" value={item.requester?.fullName} />
+            <Row label="Due Date" value={fmt(item.dueDate)} />
+            {item.decider && <Row label="Decided By" value={item.decider.fullName} />}
+          </div>
+
+          {item.description && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1">Description</p>
+              <p className="text-sm whitespace-pre-wrap bg-muted/30 rounded-md p-3">{item.description}</p>
+            </div>
+          )}
+
+          {item.decisionNote && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1">Decision Note</p>
+              <p className="text-sm italic bg-muted/30 rounded-md p-3">"{item.decisionNote}"</p>
+            </div>
+          )}
+
+          {/* Shipment line items */}
+          {isShipment && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Package className="w-4 h-4 text-primary" /> Shipment Details
+              </div>
+              {isLoading ? (
+                <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+              ) : shipment ? (
+                <>
+                  <div className="grid sm:grid-cols-2 gap-x-8 gap-y-0 bg-muted/20 rounded-lg p-3">
+                    <Row label="SR / Shipment #" value={shipment.shipmentNumber} />
+                    <Row label="Consignment #" value={shipment.consignmentNumber} />
+                    <Row
+                      label="Route"
+                      value={
+                        <span className="inline-flex items-center gap-1">
+                          {shipment.sourceWarehouse?.name} <ArrowRight className="w-3 h-3" /> {shipment.destWarehouse?.name}
+                        </span>
+                      }
+                    />
+                    <Row label="Items" value={shipment.items?.length} />
+                  </div>
+
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/40">
+                        <tr>
+                          <th className="text-left px-3 py-2 font-medium text-muted-foreground">Manufacture No.</th>
+                          <th className="text-left px-3 py-2 font-medium text-muted-foreground">Product</th>
+                          <th className="text-left px-3 py-2 font-medium text-muted-foreground">Brand</th>
+                          <th className="text-right px-3 py-2 font-medium text-muted-foreground">Quantity</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {shipment.items?.map((it) => (
+                          <tr key={it.id}>
+                            <td className="px-3 py-2 font-mono text-xs">{it.sku || it.product?.sku || '—'}</td>
+                            <td className="px-3 py-2">{it.product?.name || it.description}</td>
+                            <td className="px-3 py-2 text-muted-foreground">{it.product?.brand?.name || '—'}</td>
+                            <td className="px-3 py-2 text-right font-medium">{it.quantity} {it.product?.unitType || ''}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Could not load shipment details.</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end px-6 py-4 border-t">
+          <Button variant="outline" onClick={onClose}>Close</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DecideDialog({ item, preset, onDone, onClose }) {
   const [decision, setDecision] = useState(preset || 'APPROVED');
   const [note, setNote]         = useState('');
@@ -253,6 +370,7 @@ export default function ApprovalsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [deciding, setDeciding]     = useState(null); // { item, decision }
   const [editing, setEditing]       = useState(null);
+  const [viewing, setViewing]       = useState(null);
   const [mine, setMine]             = useState(false);
 
   const { data, isLoading } = useQuery({
@@ -356,8 +474,11 @@ export default function ApprovalsPage() {
                 return (
                   <tr key={item.id} className="hover:bg-muted/10">
                     <td className="px-4 py-3 font-medium">
-                      {item.title}
+                      <button onClick={() => setViewing(item)} className="text-left text-primary hover:underline font-medium">
+                        {item.title}
+                      </button>
                       {item.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{item.description}</p>}
+                      <p className="text-[11px] text-primary/70 mt-0.5">View details →</p>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{item.type.replace(/_/g, ' ')}</td>
                     <td className="px-4 py-3">
@@ -413,6 +534,7 @@ export default function ApprovalsPage() {
       {showCreate && <CreateDialog onCreated={refresh} onClose={() => setShowCreate(false)} />}
       {deciding   && <DecideDialog item={deciding.item} preset={deciding.decision} onDone={refresh} onClose={() => setDeciding(null)} />}
       {editing    && <EditDialog item={editing} onDone={refresh} onClose={() => setEditing(null)} />}
+      {viewing    && <DetailsDialog item={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
 }

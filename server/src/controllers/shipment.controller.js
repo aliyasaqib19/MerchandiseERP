@@ -69,7 +69,7 @@ async function getShipment(req, res) {
       sourceWarehouse: { select: { id: true, name: true } },
       destWarehouse: { select: { id: true, name: true } },
       createdByUser: { select: { id: true, fullName: true } },
-      items: { include: { product: { select: { id: true, sku: true, name: true, unitType: true, quantity: true } } } },
+      items: { include: { product: { select: { id: true, sku: true, name: true, unitType: true, quantity: true, brand: { select: { name: true } } } } } },
     },
   });
   if (!shipment) return res.status(404).json({ message: 'Shipment not found' });
