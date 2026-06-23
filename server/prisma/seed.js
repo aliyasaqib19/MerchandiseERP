@@ -933,6 +933,137 @@ async function main() {
     items: [{ product: skuMap['CON-PVC-20MM-3M'], quantity: 20 }],
   });
 
+  // ── Brands & brand products (real company stock) ──────────────────────────────
+  console.log('Seeding brands & products...');
+
+  async function ensureCategory(name) {
+    const c = await prisma.category.upsert({ where: { name }, update: {}, create: { name } });
+    return c.id;
+  }
+
+  const catFireDetection = await ensureCategory('Fire Detection');
+  const catFirePanels    = await ensureCategory('Fire Alarm Panels');
+  const catFireDevices   = await ensureCategory('Fire Alarm Devices');
+  const catFireCable     = await ensureCategory('Fire Alarm Cable');
+  const catAccessCards   = await ensureCategory('Access Control & Cards');
+  const catLighting      = await ensureCategory('Emergency Lighting');
+  const catFireDoors     = await ensureCategory('Fire Doors');
+
+  // Each brand with 1–2 representative products (from the client's real stock sheet)
+  const BRANDS = [
+    { name: 'INIM', products: [
+      { name: 'Smoke Detector', sku: 'ED-100', quantity: 10, categoryId: catFireDetection, unitType: 'PIECE', costPrice: 900,  sellingPrice: 1300 },
+      { name: 'Heat Detector',  sku: 'ED-200', quantity: 3,  categoryId: catFireDetection, unitType: 'PIECE', costPrice: 950,  sellingPrice: 1400 },
+    ]},
+    { name: 'Context Plus', products: [
+      { name: '2 Zone Panel',  sku: 'CFP-702',       quantity: 26, categoryId: catFirePanels,    unitType: 'PIECE', costPrice: 6500, sellingPrice: 9000 },
+      { name: 'Heat Detector', sku: '58000-450IMCI', quantity: 20, categoryId: catFireDetection, unitType: 'PIECE', costPrice: 700,  sellingPrice: 1050 },
+    ]},
+    { name: 'Cease Fire Italia Addressable', products: [
+      { name: 'Intelligent Photoelectric Smoke Detector', sku: 'CFI-5131', quantity: 424, categoryId: catFireDetection, unitType: 'PIECE', costPrice: 1100, sellingPrice: 1650 },
+      { name: 'Heat Detector',                            sku: 'CFI-5132', quantity: 170, categoryId: catFireDetection, unitType: 'PIECE', costPrice: 1000, sellingPrice: 1500 },
+    ]},
+    { name: 'Cease Fire Italia Conventional', products: [
+      { name: 'Smoke Detector',  sku: 'CFI1000', quantity: 837, categoryId: catFireDetection, unitType: 'PIECE', costPrice: 450, sellingPrice: 700 },
+      { name: 'Sounder Flasher', sku: 'CFI-6000', quantity: 163, categoryId: catFireDevices,   unitType: 'PIECE', costPrice: 600, sellingPrice: 900 },
+    ]},
+    { name: 'CFI Lock', products: [
+      { name: 'Em Lock',     sku: 'CFI-200', quantity: 96,  categoryId: catAccessCards, unitType: 'PIECE', costPrice: 1200, sellingPrice: 1800 },
+      { name: 'Push Button', sku: 'CFI-K6B', quantity: 100, categoryId: catAccessCards, unitType: 'PIECE', costPrice: 250,  sellingPrice: 400 },
+    ]},
+    { name: 'Lights Stock', products: [
+      { name: 'Emergency Light', sku: 'GM6-3H-HO', quantity: 20, categoryId: catLighting, unitType: 'PIECE', costPrice: 800, sellingPrice: 1200 },
+      { name: 'Exit Sign',       sku: 'GN-206',    quantity: 32, categoryId: catLighting, unitType: 'PIECE', costPrice: 600, sellingPrice: 950 },
+    ]},
+    { name: 'Fire Alarm Cable', products: [
+      { name: 'UL Listed Cable 1.5mm', sku: 'FPLR-1.5MM', quantity: 1380, categoryId: catFireCable, unitType: 'ROLL', costPrice: 60,  sellingPrice: 95 },
+      { name: 'UL Listed Cable 2.5mm', sku: 'FPLR-2.5MM', quantity: 5500, categoryId: catFireCable, unitType: 'ROLL', costPrice: 90,  sellingPrice: 140 },
+    ]},
+    { name: 'Honeywell', products: [
+      { name: '8 Zone Panel', sku: 'CFAS-408', quantity: 3,  categoryId: catFirePanels,  unitType: 'PIECE', costPrice: 8000, sellingPrice: 11500 },
+      { name: 'Sounder',      sku: 'S3-S-R',   quantity: 11, categoryId: catFireDevices, unitType: 'PIECE', costPrice: 500,  sellingPrice: 800 },
+    ]},
+    { name: 'Fire Door', products: [
+      { name: 'Fire Door Left',  sku: 'AT-1038-LHR', quantity: 6, categoryId: catFireDoors, unitType: 'PIECE', costPrice: 15000, sellingPrice: 22000 },
+      { name: 'Fire Door Right', sku: 'AT-1038-RHR', quantity: 8, categoryId: catFireDoors, unitType: 'PIECE', costPrice: 15000, sellingPrice: 22000 },
+    ]},
+    { name: 'Horinlih', products: [
+      { name: 'Smoke Detector', sku: 'AH0311-2', quantity: 5, categoryId: catFireDetection, unitType: 'PIECE', costPrice: 400, sellingPrice: 650 },
+      { name: 'Manual Call Point', sku: 'AH-0217', quantity: 5, categoryId: catFireDevices, unitType: 'PIECE', costPrice: 350, sellingPrice: 550 },
+    ]},
+    { name: 'Cards', products: [
+      { name: 'PVC Card',         sku: 'CFI-PVC',   quantity: 32000, categoryId: catAccessCards, unitType: 'PIECE', costPrice: 8,  sellingPrice: 15 },
+      { name: 'RFID Card (Serial)', sku: 'CFI-ID125', quantity: 39000, categoryId: catAccessCards, unitType: 'PIECE', costPrice: 12, sellingPrice: 22 },
+    ]},
+    { name: 'Hochiki', products: [
+      { name: '2 Zone Panel', sku: 'HFP-CP-2KS', quantity: 1, categoryId: catFirePanels, unitType: 'PIECE', costPrice: 9000, sellingPrice: 13000 },
+    ]},
+    { name: 'Maple Armour', products: [
+      { name: 'Smoke Detector', sku: 'FW-511', quantity: 2, categoryId: catFireDetection, unitType: 'PIECE', costPrice: 500, sellingPrice: 800 },
+      { name: 'Heat Detector',  sku: 'FW-521', quantity: 2, categoryId: catFireDetection, unitType: 'PIECE', costPrice: 520, sellingPrice: 820 },
+    ]},
+  ];
+
+  const brandSku = {}; // sku -> productId (for sales below)
+  for (const b of BRANDS) {
+    const brand = await prisma.brand.upsert({ where: { name: b.name }, update: {}, create: { name: b.name } });
+    for (const p of b.products) {
+      let product = await prisma.product.findUnique({ where: { sku: p.sku } });
+      if (!product) {
+        product = await prisma.product.create({
+          data: {
+            sku: p.sku, name: p.name, categoryId: p.categoryId, brandId: brand.id,
+            unitType: p.unitType, quantity: p.quantity, minThreshold: 5,
+            costPrice: p.costPrice, sellingPrice: p.sellingPrice,
+            status: 'ACTIVE', warehouseId: warehouseKarachi.id,
+          },
+        });
+        if (p.quantity > 0) {
+          await prisma.inventoryTransaction.create({
+            data: { productId: product.id, type: 'STOCK_IN', quantity: p.quantity, balanceAfter: p.quantity, warehouseId: warehouseKarachi.id, notes: 'Initial stock — seed data', createdBy: admin.id },
+          });
+        }
+      } else if (!product.brandId) {
+        await prisma.product.update({ where: { id: product.id }, data: { brandId: brand.id } });
+      }
+      brandSku[p.sku] = product.id;
+    }
+  }
+
+  // Sample sales so the product "given to client" distribution has real data
+  async function seedBrandSale({ number, client, items }) {
+    if (!client) return;
+    if (await prisma.sale.findFirst({ where: { saleNumber: number } })) return;
+    const lineData = items
+      .filter((it) => brandSku[it.sku])
+      .map((it) => ({ productId: brandSku[it.sku], description: it.name, quantity: it.qty, unitPrice: it.price, costPrice: 0, discount: 0, total: it.qty * it.price }));
+    const subtotal = lineData.reduce((a, l) => a + l.total, 0);
+    await prisma.sale.create({
+      data: {
+        saleNumber: number, clientId: client.id, createdBy: salesUser.id,
+        status: 'DELIVERED', warehouseId: warehouseKarachi.id,
+        subtotal, totalAmount: subtotal, taxRate: 0, taxAmount: 0, discountAmount: 0,
+        saleDate: new Date(Date.now() - 6 * 86400000),
+        items: { create: lineData },
+      },
+    });
+  }
+
+  await seedBrandSale({
+    number: `SALE-${year}-1001`, client: client1,
+    items: [
+      { sku: 'ED-100',  name: 'INIM Smoke Detector', qty: 4,  price: 1300 },
+      { sku: 'CFI1000', name: 'Cease Fire Smoke Detector', qty: 10, price: 700 },
+    ],
+  });
+  await seedBrandSale({
+    number: `SALE-${year}-1002`, client: client3,
+    items: [
+      { sku: 'ED-100',  name: 'INIM Smoke Detector', qty: 2, price: 1300 },
+      { sku: 'CFI-5131', name: 'Cease Fire Photoelectric Smoke Detector', qty: 5, price: 1650 },
+    ],
+  });
+
   console.log('Seed complete.');
 }
 

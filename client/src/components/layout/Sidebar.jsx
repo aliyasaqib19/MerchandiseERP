@@ -36,6 +36,7 @@ import {
   Warehouse,
   Repeat,
   Truck,
+  Tag,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
@@ -67,6 +68,7 @@ const NAV_SECTIONS = [
           { label: 'Products',        icon: Box,             to: '/inventory/products' },
           { label: 'Stock Movements', icon: ArrowLeftRight,  to: '/inventory/movements' },
           { label: 'Shipments',       icon: Truck,           to: '/inventory/shipments' },
+          { label: 'Brands',          icon: Tag,             to: '/inventory/brands' },
         ],
       },
       {

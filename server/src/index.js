@@ -25,6 +25,7 @@ const auditRoutes          = require('./routes/audit.routes');
 const reportRoutes         = require('./routes/report.routes');
 const warehouseRoutes      = require('./routes/warehouse.routes');
 const shipmentRoutes       = require('./routes/shipment.routes');
+const brandRoutes          = require('./routes/brand.routes');
 const warehouseScope       = require('./middleware/warehouseScope');
 
 const app = express();
@@ -46,6 +47,7 @@ app.use('/api/roles', roleRoutes);
 app.use('/api/permissions', permissionRoutes);
 app.use('/api/warehouses',      warehouseRoutes);
 app.use('/api/shipments',       shipmentRoutes);
+app.use('/api/brands',          brandRoutes);
 app.use('/api/inventory',       inventoryRoutes);
 app.use('/api/clients',         clientRoutes);
 app.use('/api/quotations',      quotationRoutes);

@@ -156,6 +156,18 @@ model Category {
   @@map("categories")
 }
 
+model Brand {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products Product[]
+
+  @@map("brands")
+}
+
 model Product {
   id            Int           @id @default(autoincrement())
   sku           String        @unique
@@ -169,11 +181,13 @@ model Product {
   sellingPrice  Float?
   status        ProductStatus @default(ACTIVE)
   warehouseId   Int?
+  brandId       Int?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   category      Category               @relation(fields: [categoryId], references: [id])
   warehouse     Warehouse?             @relation(fields: [warehouseId], references: [id])
+  brand         Brand?                 @relation(fields: [brandId], references: [id])
   transactions  InventoryTransaction[]
   quotationItems QuotationItem[]
   poItems        POItem[]
