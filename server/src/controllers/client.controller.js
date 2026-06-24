@@ -266,18 +266,19 @@ async function importContacts(req, res) {
     if (!name || !company) { skipped++; continue; }
 
     try {
-      let client = await prisma.client.findFirst({
+      let client = await prisma.base.client.findFirst({
         where: { companyName: { equals: company, mode: 'insensitive' } },
       });
       if (!client) {
+        // Use scoped create so new client is tagged with the active warehouse
         client = await prisma.client.create({
           data: { companyName: company, status: 'ACTIVE', createdBy: req.user.id },
         });
         clientsCreated++;
       }
 
-      const hasPrimary = await prisma.contact.count({ where: { clientId: client.id, isPrimary: true } });
-      await prisma.contact.create({
+      const hasPrimary = await prisma.base.contact.count({ where: { clientId: client.id, isPrimary: true } });
+      await prisma.base.contact.create({
         data: { clientId: client.id, fullName: name, phone: phone || null, isPrimary: hasPrimary === 0 },
       });
       created++;
