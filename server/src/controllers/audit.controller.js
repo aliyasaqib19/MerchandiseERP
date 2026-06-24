@@ -119,7 +119,7 @@ async function logAudit({ userId, action, module, resourceId, resourceType, oldV
         userAgent:    request?.get?.('user-agent') || null,
       },
     });
-  } catch (_) { /* never throw from audit */ }
+  } catch (err) { console.error('[audit] logAudit failed:', err.message); }
 }
 
 module.exports = { listAuditLogs, getAuditStats, logAudit };
