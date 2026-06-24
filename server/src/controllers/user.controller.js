@@ -120,12 +120,15 @@ async function deleteUser(req, res) {
   if (id === req.user.id) {
     return res.status(400).json({ message: 'Cannot delete your own account' });
   }
-  await prisma.base.$transaction([
-    prisma.base.refreshToken.deleteMany({ where: { userId: id } }),
-    prisma.base.userRole.deleteMany({ where: { userId: id } }),
-    prisma.base.auditLog.updateMany({ where: { userId: id }, data: { userId: null } }),
-    prisma.base.user.delete({ where: { id } }),
-  ]);
+  try {
+    await prisma.base.refreshToken.deleteMany({ where: { userId: id } });
+    await prisma.base.auditLog.updateMany({ where: { userId: id }, data: { userId: null } });
+    try { await prisma.base.userRole.deleteMany({ where: { userId: id } }); } catch (_) {}
+    await prisma.base.user.delete({ where: { id } });
+  } catch (e) {
+    console.error('[deleteUser] failed:', e.message);
+    throw e;
+  }
   logAudit({ userId: req.user.id, action: 'DELETE', module: 'USERS', resourceId: id, resourceType: 'User', req });
   res.json({ message: 'User deleted' });
 }
