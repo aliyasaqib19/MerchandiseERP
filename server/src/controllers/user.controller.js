@@ -120,15 +120,37 @@ async function deleteUser(req, res) {
   if (id === req.user.id) {
     return res.status(400).json({ message: 'Cannot delete your own account' });
   }
-  try {
-    await prisma.base.refreshToken.deleteMany({ where: { userId: id } });
-    await prisma.base.auditLog.updateMany({ where: { userId: id }, data: { userId: null } });
-    try { await prisma.base.userRole.deleteMany({ where: { userId: id } }); } catch (_) {}
-    await prisma.base.user.delete({ where: { id } });
-  } catch (e) {
-    console.error('[deleteUser] failed:', e.message);
-    throw e;
+  // Nullify all createdBy / userId references across tables before hard delete
+  const nullifyTables = [
+    ['client_transactions', 'createdBy'],
+    ['clients',             'createdBy'],
+    ['contacts',            null],
+    ['quotations',          'createdBy'],
+    ['purchase_orders',     'createdBy'],
+    ['sales',               'createdBy'],
+    ['projects',            'createdBy'],
+    ['shipments',           'createdBy'],
+    ['documents',           'createdBy'],
+    ['approval_requests',   'requestedBy'],
+    ['approval_requests',   'reviewedBy'],
+    ['client_notes',        'createdBy'],
+    ['notifications',       'userId'],
+    ['site_visits',         'createdBy'],
+    ['work_logs',           'createdBy'],
+    ['service_reports',     'createdBy'],
+    ['inventory_transactions', 'createdBy'],
+    ['sale_items',          null],
+    ['audit_logs',          'userId'],
+  ];
+  for (const [table, col] of nullifyTables) {
+    if (!col) continue;
+    try {
+      await prisma.$executeRawUnsafe(`UPDATE "${table}" SET "${col}" = NULL WHERE "${col}" = ${id}`);
+    } catch (_) {}
   }
+  await prisma.base.refreshToken.deleteMany({ where: { userId: id } });
+  try { await prisma.base.userRole.deleteMany({ where: { userId: id } }); } catch (_) {}
+  await prisma.base.user.delete({ where: { id } });
   logAudit({ userId: req.user.id, action: 'DELETE', module: 'USERS', resourceId: id, resourceType: 'User', req });
   res.json({ message: 'User deleted' });
 }
