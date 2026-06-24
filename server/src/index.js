@@ -78,7 +78,7 @@ app.post('/api/admin/full-wipe', require('./middleware/authenticate'), async (re
   if (!roles.includes('System Administrator')) return res.status(403).json({ message: 'Forbidden' });
   const prisma = require('./utils/prisma');
   const dataTables = [
-    'audit_logs','notifications','document_versions','documents','approval_requests',
+    'notifications','document_versions','documents','approval_requests',
     'report_activities','service_reports','site_photos','site_visits','work_log_items',
     'work_logs','project_assignments','projects','sale_items','sales','po_items',
     'purchase_orders','quotation_items','quotations','client_transactions','client_notes',
