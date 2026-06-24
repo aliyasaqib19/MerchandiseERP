@@ -157,12 +157,12 @@ export default function ClientsPage() {
         })}
       </div>
 
-      {tab === 'clients' && (<>
-      {/* Stats */}
+      {/* Stats — shown on both tabs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {STATS.map((s) => <StatsCard key={s.label} {...s} />)}
       </div>
 
+      {tab === 'clients' && (<>
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-48">
