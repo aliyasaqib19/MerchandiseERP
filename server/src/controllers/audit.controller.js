@@ -20,8 +20,8 @@ async function listAuditLogs(req, res, next) {
     }
 
     const [total, items] = await Promise.all([
-      prisma.auditLog.count({ where }),
-      prisma.auditLog.findMany({
+      prisma.base.auditLog.count({ where }),
+      prisma.base.auditLog.findMany({
         where,
         include: { user: { select: { id: true, fullName: true, email: true, role: { select: { name: true } } } } },
         orderBy: { createdAt: 'desc' },
@@ -32,7 +32,10 @@ async function listAuditLogs(req, res, next) {
 
     const enriched = await attachResourceNames(items);
     res.json({ total, page: Number(page), limit: Number(limit), items: enriched });
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error('[audit] listAuditLogs failed:', err.message);
+    next(err);
+  }
 }
 
 // Resolve a human-readable name for each audit log's changed resource
@@ -67,7 +70,7 @@ async function attachResourceNames(items) {
   for (const [type, idSet] of Object.entries(byType)) {
     const cfg = RESOURCE_CONFIG[type];
     try {
-      const rows = await prisma[cfg.model].findMany({
+      const rows = await prisma.base[cfg.model].findMany({
         where: { id: { in: [...idSet] } },
         select: { id: true, [cfg.field]: true },
       });
@@ -89,9 +92,9 @@ async function attachResourceNames(items) {
 async function getAuditStats(req, res, next) {
   try {
     const [total, byModule, recentUsers] = await Promise.all([
-      prisma.auditLog.count(),
-      prisma.auditLog.groupBy({ by: ['module'], _count: { id: true }, orderBy: { _count: { id: 'desc' } } }),
-      prisma.auditLog.groupBy({
+      prisma.base.auditLog.count(),
+      prisma.base.auditLog.groupBy({ by: ['module'], _count: { id: true }, orderBy: { _count: { id: 'desc' } } }),
+      prisma.base.auditLog.groupBy({
         by: ['userId'],
         _count: { id: true },
         where: { userId: { not: null } },
@@ -106,7 +109,7 @@ async function getAuditStats(req, res, next) {
 // Middleware to log audit actions — call from other controllers
 async function logAudit({ userId, action, module, resourceId, resourceType, oldValues, newValues, req: request }) {
   try {
-    await prisma.auditLog.create({
+    await prisma.base.auditLog.create({
       data: {
         userId:       userId       || null,
         action,
