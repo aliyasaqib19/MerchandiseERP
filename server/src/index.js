@@ -72,6 +72,28 @@ app.use('/api/analytics',      reportRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 
+// ── ONE-TIME FULL WIPE (remove after use) ────────────────────────────────────
+app.post('/api/admin/full-wipe', require('./middleware/authenticate'), async (req, res) => {
+  const roles = (req.user.roleNames || [req.user.roleName]).filter(Boolean);
+  if (!roles.includes('System Administrator')) return res.status(403).json({ message: 'Forbidden' });
+  const prisma = require('./utils/prisma');
+  const dataTables = [
+    'audit_logs','notifications','document_versions','documents','approval_requests',
+    'report_activities','service_reports','site_photos','site_visits','work_log_items',
+    'work_logs','project_assignments','projects','sale_items','sales','po_items',
+    'purchase_orders','quotation_items','quotations','client_transactions','client_notes',
+    'contacts','clients','shipment_items','shipments','inventory_transactions',
+    'products','brands','categories',
+  ];
+  for (const t of dataTables) { try { await prisma.$executeRawUnsafe(`DELETE FROM "${t}"`); } catch {} }
+  await prisma.$executeRawUnsafe(`DELETE FROM "refresh_tokens" WHERE "userId" != ${req.user.id}`);
+  await prisma.$executeRawUnsafe(`DELETE FROM "user_roles"`);
+  await prisma.$executeRawUnsafe(`DELETE FROM "users" WHERE id != ${req.user.id}`);
+  await prisma.$executeRawUnsafe(`DELETE FROM "role_permissions" WHERE "roleId" != (SELECT id FROM "roles" WHERE name = 'System Administrator' LIMIT 1)`);
+  await prisma.$executeRawUnsafe(`DELETE FROM "roles" WHERE name != 'System Administrator'`);
+  res.json({ message: 'Full wipe done. Only System Administrator role and your account remain.' });
+});
+
 // Serve built React client in production (Electron / packaged mode)
 if (process.env.NODE_ENV === 'production') {
   const clientDist = path.join(__dirname, '..', 'public');
