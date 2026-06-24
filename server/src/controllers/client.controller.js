@@ -247,6 +247,50 @@ async function getAllContacts(req, res) {
   res.json(contacts);
 }
 
+// Bulk-import contacts from an Excel sheet. Each row: { name, client, phone }.
+// The client is matched by company name (within the active warehouse); if it
+// doesn't exist, it is created automatically so the contact can be attached.
+async function importContacts(req, res) {
+  const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+  if (!rows.length) return res.status(400).json({ message: 'No rows found in the uploaded sheet.' });
+
+  let created = 0, clientsCreated = 0, skipped = 0;
+  const errors = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i] || {};
+    const name = String(r.name ?? r.Name ?? '').trim();
+    const company = String(r.client ?? r.Client ?? r.company ?? r.Company ?? '').trim();
+    const phone = String(r.phone ?? r.Phone ?? '').trim();
+
+    if (!name || !company) { skipped++; continue; }
+
+    try {
+      let client = await prisma.client.findFirst({
+        where: { companyName: { equals: company, mode: 'insensitive' } },
+      });
+      if (!client) {
+        client = await prisma.client.create({
+          data: { companyName: company, status: 'ACTIVE', createdBy: req.user.id },
+        });
+        clientsCreated++;
+      }
+
+      const hasPrimary = await prisma.contact.count({ where: { clientId: client.id, isPrimary: true } });
+      await prisma.contact.create({
+        data: { clientId: client.id, fullName: name, phone: phone || null, isPrimary: hasPrimary === 0 },
+      });
+      created++;
+    } catch (e) {
+      skipped++;
+      errors.push({ row: i + 1, message: e.message });
+    }
+  }
+
+  logAudit({ userId: req.user.id, action: 'IMPORT', module: 'CLIENTS', resourceType: 'Contact', newValues: { created, clientsCreated, skipped }, req });
+  res.json({ created, clientsCreated, skipped, errors });
+}
+
 async function createContact(req, res) {
   const clientId = Number(req.params.id);
   const { fullName, title, email, phone, mobile, isPrimary } = req.body;
@@ -453,7 +497,7 @@ async function getIndustries(req, res) {
 module.exports = {
   getStats,
   getClients, getClient, createClient, updateClient, deleteClient,
-  getContacts, getAllContacts, createContact, updateContact, deleteContact,
+  getContacts, getAllContacts, importContacts, createContact, updateContact, deleteContact,
   getNotes, createNote, deleteNote,
   getLedger, createTransaction, deleteTransaction,
   getClientItems,

@@ -77,7 +77,6 @@ const NAV_SECTIONS = [
         permission: 'CLIENTS_VIEW',
         children: [
           { label: 'All Clients', icon: Building2,  to: '/clients' },
-          { label: 'Contacts',   icon: Users,       to: '/clients/contacts' },
         ],
       },
       {

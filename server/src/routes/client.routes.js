@@ -12,6 +12,7 @@ router.use(authenticate);
 router.get('/stats',        authorize('CLIENTS_VIEW'), ctrl.getStats);
 router.get('/industries',   authorize('CLIENTS_VIEW'), ctrl.getIndustries);
 router.get('/all-contacts', authorize('CLIENTS_VIEW'), ctrl.getAllContacts);
+router.post('/contacts/import', authorize('CLIENTS_CREATE'), ctrl.importContacts);
 
 // ─── Clients CRUD ─────────────────────────────────────────────────────────────
 router.get('/', authorize('CLIENTS_VIEW'), ctrl.getClients);
