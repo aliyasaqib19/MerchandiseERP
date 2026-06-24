@@ -46,11 +46,11 @@ async function getStats(req, res) {
   const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
   const [totalClients, activeClients, prospects, newThisMonth, txAgg] = await Promise.all([
-    prisma.client.count(),
-    prisma.client.count({ where: { status: 'ACTIVE' } }),
-    prisma.client.count({ where: { status: 'PROSPECT' } }),
-    prisma.client.count({ where: { createdAt: { gte: startOfMonth } } }),
-    prisma.clientTransaction.groupBy({
+    prisma.base.client.count(),
+    prisma.base.client.count({ where: { status: 'ACTIVE' } }),
+    prisma.base.client.count({ where: { status: 'PROSPECT' } }),
+    prisma.base.client.count({ where: { createdAt: { gte: startOfMonth } } }),
+    prisma.base.clientTransaction.groupBy({
       by: ['type'],
       _sum: { amount: true },
     }),
@@ -62,7 +62,7 @@ async function getStats(req, res) {
   const totalPaid    = (txMap.PAYMENT || 0) + (txMap.CREDIT_NOTE || 0);
   const outstanding  = totalCharged - totalPaid;
 
-  const recentClients = await prisma.client.findMany({
+  const recentClients = await prisma.base.client.findMany({
     orderBy: { createdAt: 'desc' },
     take: 5,
     select: {
