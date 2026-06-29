@@ -136,7 +136,7 @@ export default function WarehouseSelectPage() {
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center overflow-hidden p-0.5">
-              <img src="/aljibra-logo.png" alt="Aljibra" className="w-full h-full object-contain" onError={(e)=>{e.target.style.display='none';}} />
+              <img src="/aljibra.jpg" alt="Aljibra" className="w-full h-full object-contain" onError={(e)=>{e.target.style.display='none';}} />
             </div>
             <span className="text-lg font-bold tracking-tight">Aljibra Technologies</span>
           </div>

@@ -207,7 +207,7 @@ export function Sidebar({ open, onClose }) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/60 flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow overflow-hidden">
-              <img src="/aljibra-logo.png" alt="Aljibra" className="w-full h-full object-contain" onError={(e)=>{e.target.style.display='none';e.target.nextSibling.style.display='flex';}} />
+              <img src="/aljibra.jpg" alt="Aljibra" className="w-full h-full object-contain" onError={(e)=>{e.target.style.display='none';e.target.nextSibling.style.display='flex';}} />
               <span style={{display:'none'}} className="text-white text-xs font-bold">A</span>
             </div>
             <span className="text-lg font-bold tracking-tight">Aljibra</span>

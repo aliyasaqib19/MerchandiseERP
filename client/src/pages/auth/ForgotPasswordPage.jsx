@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
           <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center shadow-lg mb-4 overflow-hidden p-1">
-            <img src="/aljibra-logo.png" alt="Aljibra Technologies" className="w-full h-full object-contain" onError={(e)=>{e.target.style.display='none';}} />
+            <img src="/aljibra.jpg" alt="Aljibra Technologies" className="w-full h-full object-contain" onError={(e)=>{e.target.style.display='none';}} />
           </div>
           <h1 className="text-3xl font-bold text-white">Aljibra Technologies</h1>
         </div>

@@ -52,7 +52,7 @@ export default function LoginPage() {
         {/* Logo & Brand */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center shadow-lg mb-4 overflow-hidden p-1">
-            <img src="/aljibra-logo.png" alt="Aljibra Technologies" className="w-full h-full object-contain" onError={(e)=>{e.target.style.display='none';}} />
+            <img src="/aljibra.jpg" alt="Aljibra Technologies" className="w-full h-full object-contain" onError={(e)=>{e.target.style.display='none';}} />
           </div>
           <h1 className="text-3xl font-bold text-white">Aljibra Technologies</h1>
           <p className="text-slate-400 text-sm mt-1">Enterprise Resource Planning</p>
@@ -157,7 +157,7 @@ export default function LoginPage() {
         </Card>
 
         <p className="text-center text-xs text-slate-500 mt-6">
-          &copy; {new Date().getFullYear()} Merchandise ERP. All rights reserved.
+          &copy; {new Date().getFullYear()} Aljibra Technologies. All rights reserved.
         </p>
       </div>
     </div>
