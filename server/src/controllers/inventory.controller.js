@@ -4,28 +4,33 @@ const { logAudit } = require('./audit.controller');
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
 async function getStats(req, res) {
-  const [totalProducts, allProducts, lowStockProducts, monthlyTxCount] = await Promise.all([
-    prisma.product.count({ where: { status: 'ACTIVE' } }),
+  const db = prisma.base;
+  const wid = req.warehouseId;
+  const wWhere = wid ? { warehouseId: wid } : {};
 
-    prisma.product.findMany({
-      where: { status: 'ACTIVE' },
+  const [totalProducts, allProducts, lowStockProducts, monthlyTxCount] = await Promise.all([
+    db.product.count({ where: { status: 'ACTIVE', ...wWhere } }),
+
+    db.product.findMany({
+      where: { status: 'ACTIVE', ...wWhere },
       select: { quantity: true, costPrice: true, minThreshold: true },
     }),
 
-    prisma.product.findMany({
+    db.product.findMany({
       where: {
         status: 'ACTIVE',
         minThreshold: { gt: 0 },
-        quantity: { lte: prisma.product.fields?.minThreshold ?? 0 },
+        ...wWhere,
       },
       select: { id: true, sku: true, name: true, quantity: true, minThreshold: true, unitType: true },
-    }).catch(() => []), // fallback — raw computed below
+    }).catch(() => []),
 
-    prisma.inventoryTransaction.count({
+    db.inventoryTransaction.count({
       where: {
         createdAt: {
           gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
         },
+        ...wWhere,
       },
     }),
   ]);
@@ -39,8 +44,8 @@ async function getStats(req, res) {
   }
 
   // Fetch actual low-stock list properly
-  const lowStockList = await prisma.product.findMany({
-    where: { status: 'ACTIVE', minThreshold: { gt: 0 } },
+  const lowStockList = await db.product.findMany({
+    where: { status: 'ACTIVE', minThreshold: { gt: 0 }, ...wWhere },
     select: {
       id: true, sku: true, name: true, quantity: true, minThreshold: true, unitType: true,
       category: { select: { name: true } },
@@ -106,6 +111,7 @@ async function getProducts(req, res) {
   if (status) where.status = status;
   if (categoryId) where.categoryId = Number(categoryId);
   if (brandId) where.brandId = Number(brandId);
+  if (req.warehouseId) where.warehouseId = req.warehouseId;
   if (search) {
     where.OR = [
       { name: { contains: search, mode: 'insensitive' } },
@@ -114,7 +120,7 @@ async function getProducts(req, res) {
     ];
   }
 
-  const products = await prisma.product.findMany({
+  const products = await prisma.base.product.findMany({
     where,
     include: {
       category: { select: { id: true, name: true } },
@@ -164,7 +170,7 @@ async function createProduct(req, res) {
 
   const initialQty = Number(quantity) || 0;
 
-  const product = await prisma.$transaction(async (tx) => {
+  const product = await prisma.base.$transaction(async (tx) => {
     const p = await tx.product.create({
       data: {
         sku: sku.toUpperCase().trim(),
@@ -179,6 +185,7 @@ async function createProduct(req, res) {
         sellingPrice: sellingPrice ? Number(sellingPrice) : null,
         status: status || 'ACTIVE',
         imageUrl: imageUrl || null,
+        warehouseId: req.warehouseId || null,
       },
       include: { category: { select: { id: true, name: true } }, brand: { select: { id: true, name: true } } },
     });
@@ -193,6 +200,7 @@ async function createProduct(req, res) {
           balanceAfter: initialQty,
           notes: 'Initial stock on product creation',
           createdBy: req.user.id,
+          warehouseId: req.warehouseId || null,
         },
       });
     }
@@ -251,7 +259,7 @@ async function stockIn(req, res) {
 
   if (qty <= 0) return res.status(400).json({ message: 'Quantity must be greater than 0' });
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.base.$transaction(async (tx) => {
     const product = await tx.product.findUnique({ where: { id: Number(productId) } });
     if (!product) throw Object.assign(new Error('Product not found'), { status: 404 });
 
@@ -271,6 +279,7 @@ async function stockIn(req, res) {
         reference: reference || null,
         notes: notes || null,
         createdBy: req.user.id,
+        warehouseId: product.warehouseId || req.warehouseId || null,
       },
       include: {
         product: { select: { id: true, sku: true, name: true, quantity: true, unitType: true } },
@@ -289,7 +298,7 @@ async function stockOut(req, res) {
 
   if (qty <= 0) return res.status(400).json({ message: 'Quantity must be greater than 0' });
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.base.$transaction(async (tx) => {
     const product = await tx.product.findUnique({ where: { id: Number(productId) } });
     if (!product) throw Object.assign(new Error('Product not found'), { status: 404 });
     if (product.quantity < qty) {
@@ -315,6 +324,7 @@ async function stockOut(req, res) {
         reference: reference || null,
         notes: notes || null,
         createdBy: req.user.id,
+        warehouseId: product.warehouseId || req.warehouseId || null,
       },
       include: {
         product: { select: { id: true, sku: true, name: true, quantity: true, unitType: true } },
@@ -333,7 +343,7 @@ async function adjustStock(req, res) {
 
   if (targetQty < 0) return res.status(400).json({ message: 'Quantity cannot be negative' });
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.base.$transaction(async (tx) => {
     const product = await tx.product.findUnique({ where: { id: Number(productId) } });
     if (!product) throw Object.assign(new Error('Product not found'), { status: 404 });
 
@@ -349,6 +359,7 @@ async function adjustStock(req, res) {
         balanceAfter: targetQty,
         notes: notes || `Manual adjustment: ${product.quantity} → ${targetQty}`,
         createdBy: req.user.id,
+        warehouseId: product.warehouseId || req.warehouseId || null,
       },
       include: {
         product: { select: { id: true, sku: true, name: true, quantity: true, unitType: true } },
@@ -381,8 +392,10 @@ async function getTransactions(req, res) {
 
   const skip = (Number(page) - 1) * Number(limit);
 
+  if (req.warehouseId) where.warehouseId = req.warehouseId;
+
   const [transactions, total] = await Promise.all([
-    prisma.inventoryTransaction.findMany({
+    prisma.base.inventoryTransaction.findMany({
       where,
       include: {
         product: {
@@ -397,7 +410,7 @@ async function getTransactions(req, res) {
       skip,
       take: Number(limit),
     }),
-    prisma.inventoryTransaction.count({ where }),
+    prisma.base.inventoryTransaction.count({ where }),
   ]);
 
   res.json({

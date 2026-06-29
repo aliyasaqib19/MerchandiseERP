@@ -26,6 +26,7 @@ async function listProjects(req, res) {
   if (status)   where.status   = status;
   if (clientId) where.clientId = Number(clientId);
   if (managerId)where.managerId= Number(managerId);
+  if (req.warehouseId) where.warehouseId = req.warehouseId;
   if (search)   where.OR = [
     { title: { contains: search, mode: 'insensitive' } },
     { projectNumber: { contains: search, mode: 'insensitive' } },
@@ -33,7 +34,7 @@ async function listProjects(req, res) {
   ];
 
   const [projects, total] = await Promise.all([
-    prisma.project.findMany({
+    prisma.base.project.findMany({
       where,
       include: {
         client:  { select: { id: true, companyName: true } },
@@ -44,7 +45,7 @@ async function listProjects(req, res) {
       skip,
       take: Number(limit),
     }),
-    prisma.project.count({ where }),
+    prisma.base.project.count({ where }),
   ]);
 
   res.json({ projects, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
@@ -53,10 +54,12 @@ async function listProjects(req, res) {
 // ─── Get Stats ────────────────────────────────────────────────────────────────
 
 async function getStats(req, res) {
+  const wWhere = req.warehouseId ? { warehouseId: req.warehouseId } : {};
   const [byStatus, total, recentProjects] = await Promise.all([
-    prisma.project.groupBy({ by: ['status'], _count: { _all: true } }),
-    prisma.project.count(),
-    prisma.project.findMany({
+    prisma.base.project.groupBy({ by: ['status'], _count: { _all: true }, where: wWhere }),
+    prisma.base.project.count({ where: wWhere }),
+    prisma.base.project.findMany({
+      where: wWhere,
       include: { client: { select: { companyName: true } }, manager: { select: { fullName: true } } },
       orderBy: { updatedAt: 'desc' },
       take: 5,
@@ -96,7 +99,7 @@ async function createProject(req, res) {
 
   const projectNumber = await generateDocNumber('project', 'projectNumber', 'PROJ');
 
-  const project = await prisma.project.create({
+  const project = await prisma.base.project.create({
     data: {
       projectNumber,
       title,
@@ -110,6 +113,7 @@ async function createProject(req, res) {
       estimatedEndDate:estimatedEndDate ? new Date(estimatedEndDate) : null,
       notes:           notes || null,
       createdBy:       req.user.id,
+      warehouseId:     req.warehouseId || null,
     },
     include: PROJECT_INCLUDE,
   });

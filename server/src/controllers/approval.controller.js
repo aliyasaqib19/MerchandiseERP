@@ -67,7 +67,7 @@ async function getApproval(req, res, next) {
 async function createApproval(req, res, next) {
   try {
     const { type, title, description, referenceId, referenceType, assignedTo, priority, dueDate } = req.body;
-    const item = await prisma.approvalRequest.create({
+    const item = await db.approvalRequest.create({
       data: {
         type, title, description, referenceId, referenceType,
         assignedTo: assignedTo || null,
@@ -75,6 +75,7 @@ async function createApproval(req, res, next) {
         dueDate:    dueDate    ? new Date(dueDate) : null,
         requestedBy: req.user.id,
         status: 'PENDING',
+        warehouseId: req.warehouseId || null,
       },
       include: {
         requester: { select: { id: true, fullName: true } },

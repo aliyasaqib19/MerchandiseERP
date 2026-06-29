@@ -29,12 +29,13 @@ function computeTotals(items, discountType, discountValue, taxRate) {
 
 async function getStats(req, res) {
   const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const wWhere = req.warehouseId ? { warehouseId: req.warehouseId } : {};
   const [total, draft, sent, approved, thisMonth] = await Promise.all([
-    prisma.quotation.count(),
-    prisma.quotation.count({ where: { status: 'DRAFT' } }),
-    prisma.quotation.count({ where: { status: 'SENT' } }),
-    prisma.quotation.count({ where: { status: 'APPROVED' } }),
-    prisma.quotation.count({ where: { createdAt: { gte: startOfMonth } } }),
+    prisma.base.quotation.count({ where: wWhere }),
+    prisma.base.quotation.count({ where: { status: 'DRAFT', ...wWhere } }),
+    prisma.base.quotation.count({ where: { status: 'SENT', ...wWhere } }),
+    prisma.base.quotation.count({ where: { status: 'APPROVED', ...wWhere } }),
+    prisma.base.quotation.count({ where: { createdAt: { gte: startOfMonth }, ...wWhere } }),
   ]);
   res.json({ total, draft, sent, approved, thisMonth });
 }
@@ -46,6 +47,7 @@ async function getQuotations(req, res) {
 
   if (status) where.status = status;
   if (clientId) where.clientId = Number(clientId);
+  if (req.warehouseId) where.warehouseId = req.warehouseId;
   if (search) {
     where.OR = [
       { quotationNumber: { contains: search, mode: 'insensitive' } },
@@ -54,7 +56,7 @@ async function getQuotations(req, res) {
   }
 
   const [quotations, total] = await Promise.all([
-    prisma.quotation.findMany({
+    prisma.base.quotation.findMany({
       where,
       include: {
         client: { select: { id: true, companyName: true } },
@@ -65,7 +67,7 @@ async function getQuotations(req, res) {
       skip,
       take: Number(limit),
     }),
-    prisma.quotation.count({ where }),
+    prisma.base.quotation.count({ where }),
   ]);
 
   res.json({ quotations, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
@@ -90,7 +92,7 @@ async function createQuotation(req, res) {
   const quotationNumber = await generateDocNumber('quotation', 'quotationNumber', 'QUO');
   const { subtotal, discountAmount, taxAmount, totalAmount } = computeTotals(items, discountType, discountValue, taxRate);
 
-  const quotation = await prisma.quotation.create({
+  const quotation = await prisma.base.quotation.create({
     data: {
       quotationNumber,
       clientId: Number(clientId),
@@ -100,6 +102,7 @@ async function createQuotation(req, res) {
       discountType, discountValue: Number(discountValue), discountAmount,
       taxRate: Number(taxRate), taxAmount,
       subtotal, totalAmount,
+      warehouseId: req.warehouseId || null,
       items: {
         create: items.map((item) => ({
           productId:   item.productId ? Number(item.productId) : null,
@@ -208,7 +211,7 @@ async function convertToSale(req, res) {
 
   const saleNumber = await generateDocNumber('sale', 'saleNumber', 'SALE');
 
-  const sale = await prisma.sale.create({
+  const sale = await prisma.base.sale.create({
     data: {
       saleNumber,
       clientId:      q.clientId,
@@ -220,6 +223,7 @@ async function convertToSale(req, res) {
       taxRate:       q.taxRate,
       taxAmount:     q.taxAmount,
       totalAmount:   q.totalAmount,
+      warehouseId:   q.warehouseId || req.warehouseId || null,
       items: {
         create: q.items.map((item) => ({
           productId:   item.productId,

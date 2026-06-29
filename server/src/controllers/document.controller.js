@@ -8,11 +8,12 @@ async function listDocuments(req, res, next) {
     if (category)  where.category  = category;
     if (projectId) where.projectId = Number(projectId);
     if (clientId)  where.clientId  = Number(clientId);
+    if (req.warehouseId) where.warehouseId = req.warehouseId;
     if (search)    where.title = { contains: search, mode: 'insensitive' };
 
     const [total, items] = await Promise.all([
-      prisma.document.count({ where }),
-      prisma.document.findMany({
+      prisma.base.document.count({ where }),
+      prisma.base.document.findMany({
         where,
         include: { uploader: { select: { id: true, fullName: true } } },
         orderBy: { createdAt: 'desc' },
@@ -44,7 +45,7 @@ async function getDocument(req, res, next) {
 async function createDocument(req, res, next) {
   try {
     const { title, description, category, fileUrl, fileName, fileSize, mimeType, projectId, clientId, tags } = req.body;
-    const doc = await prisma.document.create({
+    const doc = await prisma.base.document.create({
       data: {
         title, description,
         category: category || 'General',
@@ -56,6 +57,7 @@ async function createDocument(req, res, next) {
         tags: tags || null,
         uploadedBy: req.user.id,
         version: 1,
+        warehouseId: req.warehouseId || null,
       },
       include: { uploader: { select: { id: true, fullName: true } } },
     });

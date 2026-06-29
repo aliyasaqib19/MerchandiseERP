@@ -28,26 +28,30 @@ function computeSaleTotals(items, discountAmount, taxRate) {
 async function getDashboardStats(req, res) {
   const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
+  const db = prisma.base;
+  const wWhere = req.warehouseId ? { warehouseId: req.warehouseId } : {};
+
   const [
     quoteStats, poStats, saleStats, revenueAgg, recentSales,
   ] = await Promise.all([
     // Quotation counts
-    prisma.quotation.groupBy({ by: ['status'], _count: true }),
+    db.quotation.groupBy({ by: ['status'], _count: true, where: wWhere }),
     // PO counts
-    prisma.purchaseOrder.groupBy({ by: ['status'], _count: true }),
+    db.purchaseOrder.groupBy({ by: ['status'], _count: true, where: wWhere }),
     // Sale counts this month
     Promise.all([
-      prisma.sale.count({ where: { createdAt: { gte: startOfMonth } } }),
-      prisma.sale.count({ where: { status: 'CONFIRMED', createdAt: { gte: startOfMonth } } }),
-      prisma.sale.count({ where: { status: 'DELIVERED', createdAt: { gte: startOfMonth } } }),
+      db.sale.count({ where: { createdAt: { gte: startOfMonth }, ...wWhere } }),
+      db.sale.count({ where: { status: 'CONFIRMED', createdAt: { gte: startOfMonth }, ...wWhere } }),
+      db.sale.count({ where: { status: 'DELIVERED', createdAt: { gte: startOfMonth }, ...wWhere } }),
     ]),
     // Revenue this month (confirmed + delivered)
-    prisma.sale.aggregate({
-      where: { status: { in: ['CONFIRMED', 'DELIVERED'] }, createdAt: { gte: startOfMonth } },
+    db.sale.aggregate({
+      where: { status: { in: ['CONFIRMED', 'DELIVERED'] }, createdAt: { gte: startOfMonth }, ...wWhere },
       _sum: { totalAmount: true },
     }),
     // Recent sales
-    prisma.sale.findMany({
+    db.sale.findMany({
+      where: wWhere,
       take: 8,
       orderBy: { createdAt: 'desc' },
       include: {
@@ -91,6 +95,7 @@ async function getSales(req, res) {
 
   if (status) where.status = status;
   if (clientId) where.clientId = Number(clientId);
+  if (req.warehouseId) where.warehouseId = req.warehouseId;
   if (search) {
     where.OR = [
       { saleNumber: { contains: search, mode: 'insensitive' } },
@@ -99,7 +104,7 @@ async function getSales(req, res) {
   }
 
   const [sales, total] = await Promise.all([
-    prisma.sale.findMany({
+    prisma.base.sale.findMany({
       where,
       include: {
         client:        { select: { id: true, companyName: true } },
@@ -112,7 +117,7 @@ async function getSales(req, res) {
       skip,
       take: Number(limit),
     }),
-    prisma.sale.count({ where }),
+    prisma.base.sale.count({ where }),
   ]);
 
   res.json({ sales, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
@@ -136,7 +141,7 @@ async function createSale(req, res) {
   const saleNumber = await generateDocNumber('sale', 'saleNumber', 'SALE');
   const { subtotal, discountAmount: da, taxAmount, totalAmount } = computeSaleTotals(items, discountAmount, taxRate);
 
-  const sale = await prisma.sale.create({
+  const sale = await prisma.base.sale.create({
     data: {
       saleNumber,
       clientId:   Number(clientId),
@@ -146,6 +151,7 @@ async function createSale(req, res) {
       notes,
       subtotal, discountAmount: da, taxRate: Number(taxRate), taxAmount, totalAmount,
       saleDate:    saleDate ? new Date(saleDate) : new Date(),
+      warehouseId: req.warehouseId || null,
       items: {
         create: items.map((item) => ({
           productId:   item.productId ? Number(item.productId) : null,
@@ -174,7 +180,7 @@ async function updateSale(req, res) {
   const { clientId, quotationId, poId, saleDate, notes, discountAmount = 0, taxRate = 0, items = [] } = req.body;
   const { subtotal, discountAmount: da, taxAmount, totalAmount } = computeSaleTotals(items, discountAmount, taxRate);
 
-  const sale = await prisma.$transaction(async (tx) => {
+  const sale = await prisma.base.$transaction(async (tx) => {
     await tx.saleItem.deleteMany({ where: { saleId: id } });
     return tx.sale.update({
       where: { id },
@@ -220,7 +226,7 @@ async function deleteSale(req, res) {
 async function confirmSale(req, res) {
   const id = Number(req.params.id);
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.base.$transaction(async (tx) => {
     const sale = await tx.sale.findUnique({
       where: { id },
       include: {
@@ -259,6 +265,7 @@ async function confirmSale(req, res) {
             reference:   sale.saleNumber,
             notes:       `Sale ${sale.saleNumber} — ${item.description}`,
             createdBy:   req.user.id,
+            warehouseId: sale.warehouseId || req.warehouseId || null,
           },
         });
       }
@@ -274,6 +281,7 @@ async function confirmSale(req, res) {
         reference:   sale.saleNumber,
         date:        new Date(),
         createdBy:   req.user.id,
+        warehouseId: sale.warehouseId || req.warehouseId || null,
       },
     });
 
@@ -309,7 +317,7 @@ async function deliverSale(req, res) {
 async function cancelSale(req, res) {
   const id = Number(req.params.id);
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.base.$transaction(async (tx) => {
     const sale = await tx.sale.findUnique({
       where: { id },
       include: { items: { include: { product: true } } },
@@ -350,6 +358,7 @@ async function cancelSale(req, res) {
             reference:   sale.saleNumber,
             date:        new Date(),
             createdBy:   req.user.id,
+            warehouseId: sale.warehouseId || req.warehouseId || null,
           },
         });
       }

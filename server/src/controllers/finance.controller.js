@@ -32,26 +32,25 @@ function agingBucket(daysOverdue) {
 async function getStats(req, res) {
   const som = startOfMonth();
   const now = today();
+  const db = prisma.base;
+  const wWhere = req.warehouseId ? { warehouseId: req.warehouseId } : {};
 
   const [allTxAgg, thisMonthAgg, overdueCount, overdueAmount] = await Promise.all([
-    // All-time grouped totals for total receivables
-    prisma.clientTransaction.groupBy({
+    db.clientTransaction.groupBy({
       by: ['type'],
+      where: wWhere,
       _sum: { amount: true },
     }),
-    // This month payments + invoices
-    prisma.clientTransaction.groupBy({
+    db.clientTransaction.groupBy({
       by: ['type'],
-      where: { createdAt: { gte: som } },
+      where: { createdAt: { gte: som }, ...wWhere },
       _sum: { amount: true },
     }),
-    // Count overdue invoices (dueDate in the past)
-    prisma.clientTransaction.count({
-      where: { type: 'INVOICE', dueDate: { lt: now, not: null } },
+    db.clientTransaction.count({
+      where: { type: 'INVOICE', dueDate: { lt: now, not: null }, ...wWhere },
     }),
-    // Sum of overdue invoice amounts
-    prisma.clientTransaction.aggregate({
-      where: { type: 'INVOICE', dueDate: { lt: now, not: null } },
+    db.clientTransaction.aggregate({
+      where: { type: 'INVOICE', dueDate: { lt: now, not: null }, ...wWhere },
       _sum: { amount: true },
     }),
   ]);
@@ -64,8 +63,8 @@ async function getStats(req, res) {
   const totalReceivables = Math.max(0, totalCharged - totalPaid);
 
   // Recent payments
-  const recentPayments = await prisma.clientTransaction.findMany({
-    where: { type: { in: ['PAYMENT', 'CREDIT_NOTE'] } },
+  const recentPayments = await db.clientTransaction.findMany({
+    where: { type: { in: ['PAYMENT', 'CREDIT_NOTE'] }, ...wWhere },
     include: { client: { select: { id: true, companyName: true } } },
     orderBy: { date: 'desc' },
     take: 8,
@@ -90,13 +89,14 @@ async function getInvoices(req, res) {
 
   const where = { type: 'INVOICE' };
   if (clientId) where.clientId = Number(clientId);
+  if (req.warehouseId) where.warehouseId = req.warehouseId;
   if (dateFrom) where.date = { ...where.date, gte: new Date(dateFrom) };
   if (dateTo)   where.date = { ...where.date, lte: new Date(dateTo) };
   if (status === 'overdue')  where.dueDate = { lt: now, not: null };
   if (status === 'no_due')   where.dueDate = null;
 
   const [invoices, total] = await Promise.all([
-    prisma.clientTransaction.findMany({
+    prisma.base.clientTransaction.findMany({
       where,
       include: {
         client: { select: { id: true, companyName: true, email: true } },
@@ -107,14 +107,15 @@ async function getInvoices(req, res) {
       skip,
       take: Number(limit),
     }),
-    prisma.clientTransaction.count({ where }),
+    prisma.base.clientTransaction.count({ where }),
   ]);
 
   // Fetch outstanding balances for the clients in this page
   const clientIds = [...new Set(invoices.map((i) => i.clientId))];
-  const txRows = await prisma.clientTransaction.groupBy({
+  const wFilter = req.warehouseId ? { warehouseId: req.warehouseId } : {};
+  const txRows = await prisma.base.clientTransaction.groupBy({
     by: ['clientId', 'type'],
-    where: { clientId: { in: clientIds } },
+    where: { clientId: { in: clientIds }, ...wFilter },
     _sum: { amount: true },
   });
   const balanceMap = buildBalanceMap(txRows);
@@ -142,11 +143,12 @@ async function getPayments(req, res) {
 
   const where = { type: { in: ['PAYMENT', 'CREDIT_NOTE'] } };
   if (clientId) where.clientId = Number(clientId);
+  if (req.warehouseId) where.warehouseId = req.warehouseId;
   if (dateFrom) where.date = { ...where.date, gte: new Date(dateFrom) };
   if (dateTo)   where.date = { ...where.date, lte: new Date(dateTo) };
 
   const [payments, total] = await Promise.all([
-    prisma.clientTransaction.findMany({
+    prisma.base.clientTransaction.findMany({
       where,
       include: {
         client: { select: { id: true, companyName: true } },
@@ -156,7 +158,7 @@ async function getPayments(req, res) {
       skip,
       take: Number(limit),
     }),
-    prisma.clientTransaction.count({ where }),
+    prisma.base.clientTransaction.count({ where }),
   ]);
 
   res.json({ payments, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
@@ -168,10 +170,10 @@ async function recordPayment(req, res) {
   const { clientId, amount, description, reference, paymentMethod, date } = req.body;
 
   // Verify client exists
-  const client = await prisma.client.findUnique({ where: { id: Number(clientId) } });
+  const client = await prisma.base.client.findUnique({ where: { id: Number(clientId) } });
   if (!client) return res.status(404).json({ message: 'Client not found' });
 
-  const payment = await prisma.clientTransaction.create({
+  const payment = await prisma.base.clientTransaction.create({
     data: {
       clientId:      Number(clientId),
       type:          'PAYMENT',
@@ -181,6 +183,7 @@ async function recordPayment(req, res) {
       paymentMethod: paymentMethod || null,
       date:          date ? new Date(date) : new Date(),
       createdBy:     req.user.id,
+      warehouseId:   req.warehouseId || null,
     },
     include: {
       client: { select: { id: true, companyName: true } },
@@ -197,9 +200,13 @@ async function recordPayment(req, res) {
 async function getOutstanding(req, res) {
   const now = today();
 
+  const db2 = prisma.base;
+  const wWhere2 = req.warehouseId ? { warehouseId: req.warehouseId } : {};
+
   // Step 1: get all transaction sums grouped by clientId + type
-  const txRows = await prisma.clientTransaction.groupBy({
+  const txRows = await db2.clientTransaction.groupBy({
     by: ['clientId', 'type'],
+    where: wWhere2,
     _sum: { amount: true },
   });
 
@@ -213,16 +220,17 @@ async function getOutstanding(req, res) {
   if (clientIds.length === 0) return res.json([]);
 
   const [clients, oldestOverdueInvoices] = await Promise.all([
-    prisma.client.findMany({
-      where: { id: { in: clientIds } },
+    db2.client.findMany({
+      where: { id: { in: clientIds }, ...wWhere2 },
       select: { id: true, companyName: true, email: true, phone: true, status: true, creditLimit: true },
     }),
     // Oldest overdue invoice per client
-    prisma.clientTransaction.findMany({
+    db2.clientTransaction.findMany({
       where: {
         clientId: { in: clientIds },
         type:     'INVOICE',
         dueDate:  { lt: now, not: null },
+        ...wWhere2,
       },
       orderBy: { dueDate: 'asc' },
     }),
@@ -261,9 +269,13 @@ async function getOutstanding(req, res) {
 async function getAgedReceivables(req, res) {
   const now = today();
 
+  const db3 = prisma.base;
+  const wWhere3 = req.warehouseId ? { warehouseId: req.warehouseId } : {};
+
   // All transaction sums
-  const txRows = await prisma.clientTransaction.groupBy({
+  const txRows = await db3.clientTransaction.groupBy({
     by: ['clientId', 'type'],
+    where: wWhere3,
     _sum: { amount: true },
   });
   const balanceMap = buildBalanceMap(txRows);
@@ -274,12 +286,12 @@ async function getAgedReceivables(req, res) {
   }
 
   const [clients, allInvoices] = await Promise.all([
-    prisma.client.findMany({
-      where: { id: { in: clientIds } },
+    db3.client.findMany({
+      where: { id: { in: clientIds }, ...wWhere3 },
       select: { id: true, companyName: true, status: true },
     }),
-    prisma.clientTransaction.findMany({
-      where: { clientId: { in: clientIds }, type: 'INVOICE' },
+    db3.clientTransaction.findMany({
+      where: { clientId: { in: clientIds }, type: 'INVOICE', ...wWhere3 },
       orderBy: [{ clientId: 'asc' }, { dueDate: 'asc' }],
     }),
   ]);
@@ -339,11 +351,11 @@ async function getClientBalance(req, res) {
   const now = today();
 
   const [client, transactions] = await Promise.all([
-    prisma.client.findUnique({
+    prisma.base.client.findUnique({
       where: { id: clientId },
       select: { id: true, companyName: true, creditLimit: true, status: true },
     }),
-    prisma.clientTransaction.findMany({
+    prisma.base.clientTransaction.findMany({
       where: { clientId },
       include: { user: { select: { fullName: true } } },
       orderBy: { date: 'asc' },

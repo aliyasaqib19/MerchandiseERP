@@ -25,6 +25,7 @@ async function getPurchaseOrders(req, res) {
 
   if (status) where.status = status;
   if (clientId) where.clientId = Number(clientId);
+  if (req.warehouseId) where.warehouseId = req.warehouseId;
   if (search) {
     where.OR = [
       { poNumber: { contains: search, mode: 'insensitive' } },
@@ -33,7 +34,7 @@ async function getPurchaseOrders(req, res) {
   }
 
   const [purchaseOrders, total] = await Promise.all([
-    prisma.purchaseOrder.findMany({
+    prisma.base.purchaseOrder.findMany({
       where,
       include: {
         client:    { select: { id: true, companyName: true } },
@@ -45,7 +46,7 @@ async function getPurchaseOrders(req, res) {
       skip,
       take: Number(limit),
     }),
-    prisma.purchaseOrder.count({ where }),
+    prisma.base.purchaseOrder.count({ where }),
   ]);
 
   res.json({ purchaseOrders, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
@@ -66,7 +67,7 @@ async function createPurchaseOrder(req, res) {
   const poNumber = await generateDocNumber('purchaseOrder', 'poNumber', 'PO');
   const { subtotal, taxAmount, totalAmount } = computeTotals(items, taxRate);
 
-  const po = await prisma.purchaseOrder.create({
+  const po = await prisma.base.purchaseOrder.create({
     data: {
       poNumber,
       clientId:        Number(clientId),
@@ -79,6 +80,7 @@ async function createPurchaseOrder(req, res) {
       totalAmount,
       poDate:          poDate ? new Date(poDate) : new Date(),
       expectedDelivery: expectedDelivery ? new Date(expectedDelivery) : null,
+      warehouseId:     req.warehouseId || null,
       items: {
         create: items.map((item) => ({
           productId:   item.productId ? Number(item.productId) : null,
@@ -171,7 +173,7 @@ async function convertToSale(req, res) {
 
   const saleNumber = await generateDocNumber('sale', 'saleNumber', 'SALE');
 
-  const sale = await prisma.sale.create({
+  const sale = await prisma.base.sale.create({
     data: {
       saleNumber,
       clientId:   po.clientId,
@@ -183,6 +185,7 @@ async function convertToSale(req, res) {
       taxRate:    po.taxRate,
       taxAmount:  po.taxAmount,
       totalAmount: po.totalAmount,
+      warehouseId: po.warehouseId || req.warehouseId || null,
       items: {
         create: po.items.map((item) => ({
           productId:   item.productId,
