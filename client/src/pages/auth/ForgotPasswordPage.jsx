@@ -32,10 +32,10 @@ export default function ForgotPasswordPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-lg mb-4">
-            <Package className="w-9 h-9 text-white" />
+          <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center shadow-lg mb-4 overflow-hidden p-1">
+            <img src="/aljibra-logo.png" alt="Aljibra Technologies" className="w-full h-full object-contain" onError={(e)=>{e.target.style.display='none';}} />
           </div>
-          <h1 className="text-3xl font-bold text-white">Merchandise</h1>
+          <h1 className="text-3xl font-bold text-white">Aljibra Technologies</h1>
         </div>
 
         <Card className="border-slate-700 bg-slate-800/60 backdrop-blur shadow-2xl">

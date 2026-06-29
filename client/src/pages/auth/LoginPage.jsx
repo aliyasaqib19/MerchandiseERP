@@ -51,10 +51,10 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo & Brand */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-lg mb-4">
-            <Package className="w-9 h-9 text-white" />
+          <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center shadow-lg mb-4 overflow-hidden p-1">
+            <img src="/aljibra-logo.png" alt="Aljibra Technologies" className="w-full h-full object-contain" onError={(e)=>{e.target.style.display='none';}} />
           </div>
-          <h1 className="text-3xl font-bold text-white">Merchandise</h1>
+          <h1 className="text-3xl font-bold text-white">Aljibra Technologies</h1>
           <p className="text-slate-400 text-sm mt-1">Enterprise Resource Planning</p>
         </div>
 

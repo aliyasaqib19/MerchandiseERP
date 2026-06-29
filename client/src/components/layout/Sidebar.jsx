@@ -206,10 +206,11 @@ export function Sidebar({ open, onClose }) {
         {/* Logo */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/60 flex-shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow">
-              <Package className="w-4.5 h-4.5 text-white" />
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow overflow-hidden">
+              <img src="/aljibra-logo.png" alt="Aljibra" className="w-full h-full object-contain" onError={(e)=>{e.target.style.display='none';e.target.nextSibling.style.display='flex';}} />
+              <span style={{display:'none'}} className="text-white text-xs font-bold">A</span>
             </div>
-            <span className="text-lg font-bold tracking-tight">Merchandise</span>
+            <span className="text-lg font-bold tracking-tight">Aljibra</span>
           </div>
           <button onClick={onClose} className="lg:hidden text-slate-400 hover:text-slate-100">
             <X className="w-5 h-5" />

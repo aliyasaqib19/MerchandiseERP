@@ -26,7 +26,8 @@ router.post(
     body('fullName').notEmpty().trim(),
     body('email').isEmail(),
     body('password').isLength({ min: 8 }),
-    body('roleId').isInt(),
+    body('roleId').optional().isInt(),
+    body('roleIds').optional().isArray(),
   ],
   validate,
   createUser

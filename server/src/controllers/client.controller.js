@@ -79,6 +79,7 @@ async function getStats(req, res) {
 async function getClients(req, res) {
   const { search, status, industry } = req.query;
   const where = {};
+  if (req.warehouseId) where.warehouseId = req.warehouseId;
   if (status) where.status = status;
   if (industry) where.industry = industry;
   if (search) {
@@ -90,7 +91,7 @@ async function getClients(req, res) {
     ];
   }
 
-  const clients = await prisma.client.findMany({
+  const clients = await prisma.base.client.findMany({
     where,
     select: {
       id: true, companyName: true, industry: true, email: true, phone: true,
@@ -152,7 +153,7 @@ async function createClient(req, res) {
     primaryContact,
   } = req.body;
 
-  const client = await prisma.$transaction(async (tx) => {
+  const client = await prisma.base.$transaction(async (tx) => {
     const c = await tx.client.create({
       data: {
         companyName, industry, email, phone, mobile, website,
@@ -161,6 +162,7 @@ async function createClient(req, res) {
         status: status || 'ACTIVE',
         notes,
         createdBy: req.user.id,
+        warehouseId: req.warehouseId || null,
       },
     });
 
