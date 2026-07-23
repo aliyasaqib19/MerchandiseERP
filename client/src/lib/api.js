@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import { useWarehouseStore } from '../store/warehouseStore';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api',
   withCredentials: true,
 });
 
@@ -58,7 +58,8 @@ api.interceptors.response.use(
       }
 
       try {
-        const { data } = await axios.post('/api/auth/refresh', { refreshToken });
+        const base = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
+        const { data } = await axios.post(`${base}/auth/refresh`, { refreshToken });
         useAuthStore.getState().setTokens(data.accessToken, data.refreshToken);
         originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
         processQueue(null, data.accessToken);
