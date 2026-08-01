@@ -67,10 +67,6 @@ function SaleDetail({ sale, onClose, onRefresh, onReopened, onRemoved }) {
           <p className="text-xs text-muted-foreground">Sale Order</p>
           <h2 className="text-xl font-bold">{s.saleNumber}</h2>
           <p className="text-sm text-muted-foreground">{s.client?.companyName}</p>
-          <div className="flex gap-3 text-xs text-muted-foreground mt-0.5">
-            {s.quotation && <span>Quotation: {s.quotation.quotationNumber}</span>}
-            {s.purchaseOrder && <span>PO: {s.purchaseOrder.poNumber}</span>}
-          </div>
         </div>
         <SalesStatusBadge status={s.status} />
       </div>
@@ -327,8 +323,7 @@ export default function SalesOrdersPage() {
             <tr>
               <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Sale #</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Client</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Quotation</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">PO</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Delivery Challan</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Items</th>
               <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">Total</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Date</th>
@@ -339,11 +334,11 @@ export default function SalesOrdersPage() {
           <tbody className="divide-y">
             {isLoading ? (
               [...Array(5)].map((_, i) => (
-                <tr key={i}>{[...Array(9)].map((_, j) => <td key={j} className="px-4 py-3"><div className="h-4 bg-muted animate-pulse rounded" /></td>)}</tr>
+                <tr key={i}>{[...Array(8)].map((_, j) => <td key={j} className="px-4 py-3"><div className="h-4 bg-muted animate-pulse rounded" /></td>)}</tr>
               ))
             ) : sales.length === 0 ? (
               <tr>
-                <td colSpan={9} className="text-center py-10">
+                <td colSpan={8} className="text-center py-10">
                   <Package className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
                   <p className="text-muted-foreground text-sm">No sales orders found</p>
                 </td>
@@ -353,8 +348,7 @@ export default function SalesOrdersPage() {
                 <tr key={sale.id} className="hover:bg-muted/20 cursor-pointer group" onClick={() => setDetailId(sale.id)}>
                   <td className="px-4 py-3 font-mono text-xs font-medium">{sale.saleNumber}</td>
                   <td className="px-4 py-3 font-medium">{sale.client?.companyName}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{sale.quotation?.quotationNumber || '—'}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{sale.purchaseOrder?.poNumber || '—'}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{sale.deliveryChallanNumber || '—'}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{sale._count?.items}</td>
                   <td className="px-4 py-3 text-right font-semibold">{fmt(sale.totalAmount)}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{fmtDate(sale.saleDate)}</td>
