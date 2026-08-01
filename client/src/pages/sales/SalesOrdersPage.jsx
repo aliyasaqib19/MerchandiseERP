@@ -21,7 +21,7 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function SaleDetail({ sale, onClose, onRefresh }) {
+function SaleDetail({ sale, onClose, onRefresh, onReopened, onRemoved }) {
   const qc = useQueryClient();
   const { hasPermission } = useAuthStore();
   const canApprove = hasPermission('SALES_APPROVE');
@@ -38,6 +38,18 @@ function SaleDetail({ sale, onClose, onRefresh }) {
   const deliverMutation = useMutation({
     mutationFn: () => api.patch(`/sales/${sale.id}/deliver`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['sales'] }); onRefresh(); },
+  });
+
+  const reopenMutation = useMutation({
+    mutationFn: () => api.patch(`/sales/${sale.id}/reopen`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sales'] }); setConfirmAction(null); onReopened(); },
+    onError: (err) => setActionError(err.response?.data?.message || 'Failed to reopen sale'),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: () => api.delete(`/sales/${sale.id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sales'] }); onRemoved(); },
+    onError: (err) => setActionError(err.response?.data?.message || 'Failed to remove sale'),
   });
 
   const cancelMutation = useMutation({
@@ -180,6 +192,41 @@ function SaleDetail({ sale, onClose, onRefresh }) {
         </div>
       )}
 
+      {confirmAction === 'reopen' && (
+        <div className="border rounded-xl p-4 bg-amber-50 space-y-3">
+          <p className="text-sm font-medium text-amber-700">Edit this delivered sale?</p>
+          <ul className="text-xs text-amber-600 space-y-1 list-disc list-inside">
+            <li>Restores the inventory quantities that were deducted</li>
+            <li>Issues a credit note and unlinks the generated invoice</li>
+            <li>Reopens the sale as Draft so you can edit and re-confirm it</li>
+          </ul>
+          <div className="flex gap-2">
+            <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => reopenMutation.mutate()} disabled={reopenMutation.isPending}>
+              {reopenMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Edit2 className="w-3.5 h-3.5" />}
+              Yes, Reopen & Edit
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setConfirmAction(null)}>Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      {confirmAction === 'remove' && (
+        <div className="border rounded-xl p-4 bg-red-50 space-y-3">
+          <p className="text-sm font-medium text-red-700">Permanently remove this sale?</p>
+          <ul className="text-xs text-red-600 space-y-1 list-disc list-inside">
+            {s.status === 'DELIVERED' && <li>Restores inventory and issues a credit note for the invoice</li>}
+            <li>This cannot be undone</li>
+          </ul>
+          <div className="flex gap-2">
+            <Button size="sm" variant="destructive" onClick={() => removeMutation.mutate()} disabled={removeMutation.isPending}>
+              {removeMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+              Yes, Remove
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setConfirmAction(null)}>Keep</Button>
+          </div>
+        </div>
+      )}
+
       {/* Action Buttons */}
       {!confirmAction && (
         <div className="flex flex-wrap gap-2 border-t pt-4">
@@ -194,9 +241,19 @@ function SaleDetail({ sale, onClose, onRefresh }) {
               Mark Delivered
             </Button>
           )}
+          {s.status === 'DELIVERED' && canApprove && (
+            <Button size="sm" variant="outline" onClick={() => { setActionError(''); setConfirmAction('reopen'); }}>
+              <Edit2 className="w-3.5 h-3.5" /> Edit
+            </Button>
+          )}
           {['DRAFT', 'CONFIRMED'].includes(s.status) && canApprove && (
             <Button size="sm" variant="outline" className="text-destructive ml-auto" onClick={() => { setActionError(''); setConfirmAction('cancel'); }}>
               <XCircle className="w-3.5 h-3.5" /> Cancel Sale
+            </Button>
+          )}
+          {s.status === 'DELIVERED' && canUpdate && (
+            <Button size="sm" variant="outline" className="text-destructive ml-auto" onClick={() => { setActionError(''); setConfirmAction('remove'); }}>
+              <XCircle className="w-3.5 h-3.5" /> Remove
             </Button>
           )}
         </div>
@@ -331,7 +388,15 @@ export default function SalesOrdersPage() {
               )}
             </DialogTitle>
           </DialogHeader>
-          {detail && <SaleDetail sale={detail} onClose={() => setDetailId(null)} onRefresh={() => { refetchDetail(); qc.invalidateQueries({ queryKey: ['sales'] }); }} />}
+          {detail && (
+            <SaleDetail
+              sale={detail}
+              onClose={() => setDetailId(null)}
+              onRefresh={() => { refetchDetail(); qc.invalidateQueries({ queryKey: ['sales'] }); }}
+              onReopened={() => setEditingId(detail.id)}
+              onRemoved={() => setDetailId(null)}
+            />
+          )}
         </DialogContent>
       </Dialog>
 

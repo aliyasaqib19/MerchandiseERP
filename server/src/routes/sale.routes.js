@@ -31,5 +31,6 @@ router.delete('/:id', authorize('SALES_UPDATE'), ctrl.deleteSale);
 router.patch('/:id/confirm', authorize('SALES_APPROVE'), ctrl.confirmSale);
 router.patch('/:id/deliver', authorize('SALES_UPDATE'),  ctrl.deliverSale);
 router.patch('/:id/cancel',  authorize('SALES_APPROVE'), ctrl.cancelSale);
+router.patch('/:id/reopen',  authorize('SALES_APPROVE'), ctrl.reopenSale);
 
 module.exports = router;

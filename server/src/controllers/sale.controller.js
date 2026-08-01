@@ -215,12 +215,113 @@ async function updateSale(req, res) {
 
 async function deleteSale(req, res) {
   const id = Number(req.params.id);
-  const sale = await prisma.sale.findUnique({ where: { id } });
-  if (!sale) return res.status(404).json({ message: 'Not found' });
-  if (sale.status !== 'DRAFT') return res.status(400).json({ message: 'Only DRAFT sales can be deleted' });
-  await prisma.sale.delete({ where: { id } });
+
+  await prisma.base.$transaction(async (tx) => {
+    const sale = await tx.sale.findUnique({
+      where: { id },
+      include: { items: { include: { product: true } } },
+    });
+    if (!sale) throw Object.assign(new Error('Not found'), { status: 404 });
+
+    // Reverse inventory + invoice effects for sales that already applied them
+    if (sale.status === 'CONFIRMED' || sale.status === 'DELIVERED') {
+      for (const item of sale.items) {
+        if (item.productId && item.product) {
+          const restoredQty = item.product.quantity + item.quantity;
+          await tx.product.update({ where: { id: item.productId }, data: { quantity: restoredQty } });
+          await tx.inventoryTransaction.create({
+            data: {
+              productId:    item.productId,
+              type:         'RETURN',
+              quantity:     item.quantity,
+              balanceAfter: restoredQty,
+              reference:    sale.saleNumber,
+              notes:        `Sale ${sale.saleNumber} removed — stock restored`,
+              createdBy:    req.user.id,
+            },
+          });
+        }
+      }
+
+      if (sale.invoiceId) {
+        await tx.clientTransaction.create({
+          data: {
+            clientId:    sale.clientId,
+            type:        'CREDIT_NOTE',
+            amount:      sale.totalAmount,
+            description: `Credit note — Sale ${sale.saleNumber} removed`,
+            reference:   sale.saleNumber,
+            date:        new Date(),
+            createdBy:   req.user.id,
+            warehouseId: sale.warehouseId || req.warehouseId || null,
+          },
+        });
+        await tx.sale.update({ where: { id }, data: { invoiceId: null } });
+      }
+    }
+
+    await tx.saleItem.deleteMany({ where: { saleId: id } });
+    await tx.sale.delete({ where: { id } });
+  });
+
   logAudit({ userId: req.user.id, action: 'DELETE', module: 'SALES', resourceId: id, resourceType: 'Sale', req });
   res.json({ message: 'Sale deleted' });
+}
+
+async function reopenSale(req, res) {
+  const id = Number(req.params.id);
+
+  const result = await prisma.base.$transaction(async (tx) => {
+    const sale = await tx.sale.findUnique({
+      where: { id },
+      include: { items: { include: { product: true } } },
+    });
+
+    if (!sale) throw Object.assign(new Error('Not found'), { status: 404 });
+    if (sale.status !== 'DELIVERED') throw Object.assign(new Error('Only DELIVERED sales can be reopened'), { status: 400 });
+
+    for (const item of sale.items) {
+      if (item.productId && item.product) {
+        const restoredQty = item.product.quantity + item.quantity;
+        await tx.product.update({ where: { id: item.productId }, data: { quantity: restoredQty } });
+        await tx.inventoryTransaction.create({
+          data: {
+            productId:    item.productId,
+            type:         'RETURN',
+            quantity:     item.quantity,
+            balanceAfter: restoredQty,
+            reference:    sale.saleNumber,
+            notes:        `Sale ${sale.saleNumber} reopened for edit — stock restored`,
+            createdBy:    req.user.id,
+          },
+        });
+      }
+    }
+
+    if (sale.invoiceId) {
+      await tx.clientTransaction.create({
+        data: {
+          clientId:    sale.clientId,
+          type:        'CREDIT_NOTE',
+          amount:      sale.totalAmount,
+          description: `Credit note — Sale ${sale.saleNumber} reopened for edit`,
+          reference:   sale.saleNumber,
+          date:        new Date(),
+          createdBy:   req.user.id,
+          warehouseId: sale.warehouseId || req.warehouseId || null,
+        },
+      });
+    }
+
+    return tx.sale.update({
+      where: { id },
+      data: { status: 'DRAFT', invoiceId: null },
+      include: SALE_INCLUDE,
+    });
+  });
+
+  logAudit({ userId: req.user.id, action: 'REOPEN', module: 'SALES', resourceId: result.id, resourceType: 'Sale', req });
+  res.json(result);
 }
 
 // ─── Confirm Sale (core ERP workflow) ─────────────────────────────────────────
@@ -380,5 +481,5 @@ async function cancelSale(req, res) {
 module.exports = {
   getDashboardStats,
   getSales, getSale, createSale, updateSale, deleteSale,
-  confirmSale, deliverSale, cancelSale,
+  confirmSale, deliverSale, cancelSale, reopenSale,
 };
