@@ -17,7 +17,6 @@ import {
   FileText,
   Receipt,
   Banknote,
-  ClipboardList,
   CalendarCheck,
   BookOpen,
   PieChart,
@@ -37,6 +36,8 @@ import {
   Repeat,
   Truck,
   Tag,
+  RotateCcw,
+  PackageCheck,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
@@ -85,9 +86,9 @@ const NAV_SECTIONS = [
         permission: 'SALES_VIEW',
         children: [
           { label: 'Overview',        icon: PieChart,      to: '/sales' },
-          { label: 'Quotations',      icon: FileText,      to: '/sales/quotations' },
-          { label: 'Purchase Orders', icon: ClipboardList, to: '/sales/purchase-orders' },
           { label: 'Sales Orders',    icon: Receipt,       to: '/sales/orders' },
+          { label: 'Return Items',    icon: RotateCcw,     to: '/sales/returns' },
+          { label: 'Demo Items',      icon: PackageCheck,  to: '/sales/demo-items' },
         ],
       },
       {

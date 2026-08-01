@@ -39,6 +39,8 @@ import SalesDashboard from './pages/sales/SalesDashboard';
 import QuotationsPage from './pages/sales/QuotationsPage';
 import PurchaseOrdersPage from './pages/sales/PurchaseOrdersPage';
 import SalesOrdersPage from './pages/sales/SalesOrdersPage';
+import ReturnsPage from './pages/sales/ReturnsPage';
+import DemoItemsPage from './pages/sales/DemoItemsPage';
 
 // Projects
 import ProjectsPage from './pages/projects/ProjectsPage';
@@ -123,6 +125,8 @@ export default function App() {
             <Route path="/sales/quotations"       element={<Guarded permission="SALES_VIEW"><QuotationsPage /></Guarded>} />
             <Route path="/sales/purchase-orders"  element={<Guarded permission="SALES_VIEW"><PurchaseOrdersPage /></Guarded>} />
             <Route path="/sales/orders"           element={<Guarded permission="SALES_VIEW"><SalesOrdersPage /></Guarded>} />
+            <Route path="/sales/returns"          element={<Guarded permission="SALES_VIEW"><ReturnsPage /></Guarded>} />
+            <Route path="/sales/demo-items"       element={<Guarded permission="SALES_VIEW"><DemoItemsPage /></Guarded>} />
 
             {/* ── Projects ── */}
             <Route path="/projects"                                         element={<Guarded permission="PROJECTS_VIEW"><ProjectsPage /></Guarded>} />

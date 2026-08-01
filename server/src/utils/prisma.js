@@ -14,6 +14,8 @@ const SCOPED_MODELS = new Set([
   'Quotation',
   'PurchaseOrder',
   'Sale',
+  'SalesReturn',
+  'DemoItem',
   'Project',
   'Document',
   'ApprovalRequest',

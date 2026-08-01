@@ -13,6 +13,8 @@ const clientRoutes         = require('./routes/client.routes');
 const quotationRoutes      = require('./routes/quotation.routes');
 const purchaseOrderRoutes  = require('./routes/purchaseOrder.routes');
 const saleRoutes           = require('./routes/sale.routes');
+const returnRoutes         = require('./routes/return.routes');
+const demoRoutes           = require('./routes/demo.routes');
 const financeRoutes        = require('./routes/finance.routes');
 const projectRoutes        = require('./routes/project.routes');
 const siteVisitRoutes      = require('./routes/siteVisit.routes');
@@ -53,6 +55,8 @@ app.use('/api/clients',         clientRoutes);
 app.use('/api/quotations',      quotationRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/sales',           saleRoutes);
+app.use('/api/returns',         returnRoutes);
+app.use('/api/demo-items',      demoRoutes);
 app.use('/api/finance',         financeRoutes);
 app.use('/api/projects',        projectRoutes);
 // Nested resources (mergeParams handled inside routers)
