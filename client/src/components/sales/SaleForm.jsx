@@ -1,21 +1,23 @@
+import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { Loader2, Plus } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select } from '../ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { LineItemsEditor } from './LineItemsEditor';
+import ClientForm from '../clients/ClientForm';
 import api from '../../lib/api';
 
 const schema = z.object({
   clientId:      z.coerce.number().min(1, 'Client is required'),
-  quotationId:   z.coerce.number().optional().or(z.literal('')),
-  poId:          z.coerce.number().optional().or(z.literal('')),
   saleDate:      z.string().optional(),
   notes:         z.string().optional(),
+  deliveryChallanNumber: z.string().optional(),
   discountAmount: z.coerce.number().min(0).default(0),
   taxRate:       z.coerce.number().min(0).max(100).default(0),
   items:         z.array(z.object({
@@ -35,6 +37,8 @@ function fmt(n) {
 export default function SaleForm({ onSuccess, defaultValues, saleId }) {
   const isEdit = !!saleId;
   const today  = new Date().toISOString().split('T')[0];
+  const queryClient = useQueryClient();
+  const [showAddClient, setShowAddClient] = useState(false);
 
   const { data: clients = [] } = useQuery({
     queryKey: ['clients-simple'],
@@ -45,10 +49,9 @@ export default function SaleForm({ onSuccess, defaultValues, saleId }) {
     resolver: zodResolver(schema),
     defaultValues: {
       clientId:       defaultValues?.clientId || '',
-      quotationId:    defaultValues?.quotationId || '',
-      poId:           defaultValues?.poId || '',
       saleDate:       defaultValues?.saleDate?.split('T')[0] || today,
       notes:          defaultValues?.notes || '',
+      deliveryChallanNumber: defaultValues?.deliveryChallanNumber || '',
       discountAmount: defaultValues?.discountAmount || 0,
       taxRate:        defaultValues?.taxRate || 0,
       items:          defaultValues?.items?.map((i) => ({
@@ -62,20 +65,6 @@ export default function SaleForm({ onSuccess, defaultValues, saleId }) {
     },
   });
 
-  const clientId = useWatch({ control, name: 'clientId' });
-
-  const { data: clientQuotations = [] } = useQuery({
-    queryKey: ['client-quotations', clientId],
-    queryFn: () => api.get(`/quotations?clientId=${clientId}&status=APPROVED&limit=100`).then((r) => r.data.quotations || []),
-    enabled: !!clientId,
-  });
-
-  const { data: clientPOs = [] } = useQuery({
-    queryKey: ['client-pos', clientId],
-    queryFn: () => api.get(`/purchase-orders?clientId=${clientId}&status=APPROVED&limit=100`).then((r) => r.data.purchaseOrders || []),
-    enabled: !!clientId,
-  });
-
   const watchedItems    = useWatch({ control, name: 'items' }) || [];
   const discountAmount  = parseFloat(useWatch({ control, name: 'discountAmount' })) || 0;
   const taxRate         = parseFloat(useWatch({ control, name: 'taxRate' })) || 0;
@@ -85,31 +74,10 @@ export default function SaleForm({ onSuccess, defaultValues, saleId }) {
   const taxAmount  = (subtotal - discountAmount) * taxRate / 100;
   const total      = subtotal - discountAmount + taxAmount;
 
-  async function prefillFrom(type, id) {
-    if (!id) return;
-    try {
-      const url = type === 'quotation' ? `/quotations/${id}` : `/purchase-orders/${id}`;
-      const { data: doc } = await api.get(url);
-      setValue('clientId', doc.clientId);
-      setValue('discountAmount', doc.discountAmount || 0);
-      setValue('taxRate', doc.taxRate);
-      setValue('items', (doc.items || []).map((item) => ({
-        productId:   item.productId || '',
-        description: item.description,
-        quantity:    item.quantity,
-        unitPrice:   item.unitPrice,
-        costPrice:   item.costPrice || 0,
-        discount:    item.discount || 0,
-      })));
-    } catch {}
-  }
-
   async function onSubmit(values) {
     try {
       const payload = {
         ...values,
-        quotationId: values.quotationId ? Number(values.quotationId) : null,
-        poId:        values.poId ? Number(values.poId) : null,
         items: values.items.map((item) => ({
           ...item,
           productId: item.productId ? Number(item.productId) : null,
@@ -137,43 +105,21 @@ export default function SaleForm({ onSuccess, defaultValues, saleId }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2 space-y-1.5">
           <Label>Client *</Label>
-          <Select {...register('clientId')}>
-            <option value="">Select client...</option>
-            {clients.map((c) => <option key={c.id} value={c.id}>{c.companyName}</option>)}
-          </Select>
+          <div className="flex gap-2">
+            <Select {...register('clientId')} className="flex-1">
+              <option value="">Select client...</option>
+              {clients.map((c) => <option key={c.id} value={c.id}>{c.companyName}</option>)}
+            </Select>
+            <Button type="button" variant="outline" onClick={() => setShowAddClient(true)}>
+              <Plus className="w-4 h-4" /> Add New Client
+            </Button>
+          </div>
           {errors.clientId && <p className="text-xs text-destructive">{errors.clientId.message}</p>}
         </div>
 
         <div className="space-y-1.5">
-          <Label>From Quotation <span className="text-muted-foreground text-xs">(optional)</span></Label>
-          <Select
-            {...register('quotationId')}
-            onChange={(e) => {
-              register('quotationId').onChange(e);
-              if (e.target.value) prefillFrom('quotation', e.target.value);
-            }}
-          >
-            <option value="">None</option>
-            {clientQuotations.map((q) => (
-              <option key={q.id} value={q.id}>{q.quotationNumber}</option>
-            ))}
-          </Select>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label>From PO <span className="text-muted-foreground text-xs">(optional)</span></Label>
-          <Select
-            {...register('poId')}
-            onChange={(e) => {
-              register('poId').onChange(e);
-              if (e.target.value) prefillFrom('po', e.target.value);
-            }}
-          >
-            <option value="">None</option>
-            {clientPOs.map((po) => (
-              <option key={po.id} value={po.id}>{po.poNumber}</option>
-            ))}
-          </Select>
+          <Label>Delivery Challan Number</Label>
+          <Input placeholder="DC-0001" {...register('deliveryChallanNumber')} />
         </div>
 
         <div className="space-y-1.5">
@@ -238,6 +184,19 @@ export default function SaleForm({ onSuccess, defaultValues, saleId }) {
           {isEdit ? 'Save Changes' : 'Create Sale'}
         </Button>
       </div>
+
+      <Dialog open={showAddClient} onOpenChange={setShowAddClient}>
+        <DialogContent className="max-w-2xl" onClose={() => setShowAddClient(false)}>
+          <DialogHeader><DialogTitle>Add New Client</DialogTitle></DialogHeader>
+          <ClientForm
+            onSuccess={async (newClient) => {
+              setShowAddClient(false);
+              await queryClient.invalidateQueries({ queryKey: ['clients-simple'] });
+              if (newClient?.id) setValue('clientId', newClient.id);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }

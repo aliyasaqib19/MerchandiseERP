@@ -66,6 +66,7 @@ function SaleDetail({ sale, onClose, onRefresh }) {
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div><span className="text-muted-foreground">Sale Date:</span> {fmtDate(s.saleDate)}</div>
         <div><span className="text-muted-foreground">Created By:</span> {s.createdByUser?.fullName}</div>
+        {s.deliveryChallanNumber && <div><span className="text-muted-foreground">Delivery Challan #:</span> {s.deliveryChallanNumber}</div>}
         {s.invoice && (
           <div className="col-span-2 p-2 rounded-lg bg-green-50 border border-green-200 text-xs text-green-700">
             Invoice generated: {s.invoice.reference} — {fmt(s.invoice.amount)} on {fmtDate(s.invoice.date)}

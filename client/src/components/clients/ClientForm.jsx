@@ -85,11 +85,12 @@ export default function ClientForm({ onSuccess, defaultValues, clientId }) {
       };
 
       if (isEdit) {
-        await api.put(`/clients/${clientId}`, payload);
+        const { data } = await api.put(`/clients/${clientId}`, payload);
+        onSuccess?.(data);
       } else {
-        await api.post('/clients', payload);
+        const { data } = await api.post('/clients', payload);
+        onSuccess?.(data);
       }
-      onSuccess?.();
     } catch (err) {
       setError('root', { message: err.response?.data?.message || 'Something went wrong' });
     }

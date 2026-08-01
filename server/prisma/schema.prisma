@@ -418,6 +418,7 @@ model Sale {
   createdBy      Int
   status         SaleStatus @default(DRAFT)
   notes          String?
+  deliveryChallanNumber String?
   subtotal       Float      @default(0)
   discountAmount Float      @default(0)
   taxRate        Float      @default(0)

@@ -134,7 +134,7 @@ async function getSale(req, res) {
 
 async function createSale(req, res) {
   const {
-    clientId, quotationId, poId, saleDate, notes,
+    clientId, quotationId, poId, saleDate, notes, deliveryChallanNumber,
     discountAmount = 0, taxRate = 0, items = [],
   } = req.body;
 
@@ -149,6 +149,7 @@ async function createSale(req, res) {
       poId:        poId ? Number(poId) : null,
       createdBy:   req.user.id,
       notes,
+      deliveryChallanNumber: deliveryChallanNumber || null,
       subtotal, discountAmount: da, taxRate: Number(taxRate), taxAmount, totalAmount,
       saleDate:    saleDate ? new Date(saleDate) : new Date(),
       warehouseId: req.warehouseId || null,
@@ -177,7 +178,7 @@ async function updateSale(req, res) {
   if (!existing) return res.status(404).json({ message: 'Not found' });
   if (existing.status !== 'DRAFT') return res.status(400).json({ message: 'Only DRAFT sales can be edited' });
 
-  const { clientId, quotationId, poId, saleDate, notes, discountAmount = 0, taxRate = 0, items = [] } = req.body;
+  const { clientId, quotationId, poId, saleDate, notes, deliveryChallanNumber, discountAmount = 0, taxRate = 0, items = [] } = req.body;
   const { subtotal, discountAmount: da, taxAmount, totalAmount } = computeSaleTotals(items, discountAmount, taxRate);
 
   const sale = await prisma.base.$transaction(async (tx) => {
@@ -189,6 +190,7 @@ async function updateSale(req, res) {
         quotationId: quotationId ? Number(quotationId) : null,
         poId:        poId ? Number(poId) : null,
         notes,
+        deliveryChallanNumber: deliveryChallanNumber || null,
         subtotal, discountAmount: da, taxRate: Number(taxRate), taxAmount, totalAmount,
         saleDate:    saleDate ? new Date(saleDate) : undefined,
         items: {
