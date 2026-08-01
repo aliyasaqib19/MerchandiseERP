@@ -164,7 +164,11 @@ export default function SalesDashboard() {
           </div>
           <div className="divide-y">
             {stats.recentSales.map((sale) => (
-              <div key={sale.id} className="flex items-center justify-between px-4 py-3 hover:bg-muted/20">
+              <Link
+                key={sale.id}
+                to={`/sales/orders?id=${sale.id}`}
+                className="flex items-center justify-between px-4 py-3 hover:bg-muted/20"
+              >
                 <div>
                   <p className="text-sm font-medium">{sale.saleNumber}</p>
                   <p className="text-xs text-muted-foreground">{sale.client?.companyName} · {fmtDate(sale.createdAt)}</p>
@@ -173,7 +177,7 @@ export default function SalesDashboard() {
                   <span className="text-sm font-semibold">{fmt(sale.totalAmount)}</span>
                   <SalesStatusBadge status={sale.status} />
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>

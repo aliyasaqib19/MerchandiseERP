@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus, Search, Package, ChevronRight, CheckCircle2,
@@ -263,8 +264,13 @@ export default function SalesOrdersPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [showCreate, setShowCreate] = useState(false);
-  const [detailId, setDetailId]     = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [detailId, setDetailId]     = useState(() => searchParams.get('id') ? Number(searchParams.get('id')) : null);
   const [editingId, setEditingId]   = useState(null);
+
+  useEffect(() => {
+    if (searchParams.get('id')) setSearchParams({}, { replace: true });
+  }, []);
 
   const { data, isLoading } = useQuery({
     queryKey: ['sales', { search, status }],
