@@ -428,6 +428,8 @@ model Sale {
   status                SaleStatus @default(DRAFT)
   notes                 String?
   deliveryChallanNumber String?
+  challanFileUrl        String?
+  challanFileName       String?
   subtotal              Float      @default(0)
   discountAmount        Float      @default(0)
   taxRate               Float      @default(0)

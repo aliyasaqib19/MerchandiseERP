@@ -324,6 +324,23 @@ async function reopenSale(req, res) {
   res.json(result);
 }
 
+async function uploadChallanFile(req, res) {
+  const id = Number(req.params.id);
+  const { fileUrl, fileName } = req.body;
+
+  const existing = await prisma.sale.findUnique({ where: { id } });
+  if (!existing) return res.status(404).json({ message: 'Not found' });
+
+  const sale = await prisma.base.sale.update({
+    where: { id },
+    data: { challanFileUrl: fileUrl, challanFileName: fileName || null },
+    include: SALE_INCLUDE,
+  });
+
+  logAudit({ userId: req.user.id, action: 'UPDATE', module: 'SALES', resourceId: id, resourceType: 'Sale', newValues: { challanFileName: fileName }, req });
+  res.json(sale);
+}
+
 // ─── Confirm Sale (core ERP workflow) ─────────────────────────────────────────
 
 async function confirmSale(req, res) {
@@ -481,5 +498,5 @@ async function cancelSale(req, res) {
 module.exports = {
   getDashboardStats,
   getSales, getSale, createSale, updateSale, deleteSale,
-  confirmSale, deliverSale, cancelSale, reopenSale,
+  confirmSale, deliverSale, cancelSale, reopenSale, uploadChallanFile,
 };

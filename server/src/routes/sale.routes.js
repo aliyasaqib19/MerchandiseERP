@@ -33,4 +33,11 @@ router.patch('/:id/deliver', authorize('SALES_UPDATE'),  ctrl.deliverSale);
 router.patch('/:id/cancel',  authorize('SALES_APPROVE'), ctrl.cancelSale);
 router.patch('/:id/reopen',  authorize('SALES_APPROVE'), ctrl.reopenSale);
 
+router.patch('/:id/challan-file',
+  authorize('SALES_UPDATE'),
+  [body('fileUrl').notEmpty()],
+  validate,
+  ctrl.uploadChallanFile
+);
+
 module.exports = router;

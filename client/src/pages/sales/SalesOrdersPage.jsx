@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus, Search, Package, ChevronRight, CheckCircle2,
-  Truck, XCircle, Loader2, Edit2, AlertTriangle,
+  Truck, XCircle, Loader2, Edit2, AlertTriangle, Upload, FileText,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -59,6 +59,24 @@ function SaleDetail({ sale, onClose, onRefresh, onReopened, onRemoved }) {
     onError: (err) => setActionError(err.response?.data?.message || 'Failed to cancel'),
   });
 
+  const [uploadError, setUploadError] = useState('');
+  const uploadMutation = useMutation({
+    mutationFn: ({ fileUrl, fileName }) => api.patch(`/sales/${sale.id}/challan-file`, { fileUrl, fileName }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sales'] }); onRefresh(); },
+    onError: (err) => setUploadError(err.response?.data?.message || 'Failed to upload file'),
+  });
+
+  function onChallanFileChange(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    setUploadError('');
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { setUploadError('File must be under 10 MB.'); return; }
+    const reader = new FileReader();
+    reader.onload = () => uploadMutation.mutate({ fileUrl: reader.result, fileName: file.name });
+    reader.readAsDataURL(file);
+  }
+
   const s = sale;
 
   return (
@@ -69,8 +87,26 @@ function SaleDetail({ sale, onClose, onRefresh, onReopened, onRemoved }) {
           <h2 className="text-xl font-bold">{s.saleNumber}</h2>
           <p className="text-sm text-muted-foreground">{s.client?.companyName}</p>
         </div>
-        <SalesStatusBadge status={s.status} />
+        <div className="flex items-center gap-2">
+          <SalesStatusBadge status={s.status} />
+        </div>
       </div>
+
+      {canUpdate && (
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-xs border border-dashed rounded-lg px-3 py-2 cursor-pointer hover:bg-muted/40 transition-colors">
+            {uploadMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+            {s.challanFileUrl ? 'Replace Challan File' : 'Upload Challan File'}
+            <input type="file" accept="image/*,application/pdf" className="hidden" onChange={onChallanFileChange} disabled={uploadMutation.isPending} />
+          </label>
+          {s.challanFileUrl && (
+            <a href={s.challanFileUrl} target="_blank" rel="noreferrer" download={s.challanFileName || 'challan'} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+              <FileText className="w-3.5 h-3.5" /> {s.challanFileName || 'View file'}
+            </a>
+          )}
+        </div>
+      )}
+      {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
 
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div><span className="text-muted-foreground">Sale Date:</span> {fmtDate(s.saleDate)}</div>
