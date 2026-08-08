@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Building2, Mail, Phone, Globe, MapPin,
   Edit2, Trash2, Plus, MoreVertical, FileText, CreditCard,
-  Users, Activity, BookOpen, AlertCircle, Loader2, Package,
+  Users, Activity, BookOpen, AlertCircle, Loader2, Package, RotateCcw,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
@@ -20,6 +20,7 @@ const TABS = [
   { id: 'activity',  label: 'Activity',     icon: Activity },
   { id: 'ledger',    label: 'Ledger',       icon: BookOpen },
   { id: 'items',     label: 'Item History', icon: Package },
+  { id: 'returns',   label: 'Returns',      icon: RotateCcw },
 ];
 
 function fmt(n) {
@@ -552,6 +553,61 @@ function ItemsTab({ client }) {
   );
 }
 
+/* ─── Returns Tab ─── */
+function ReturnsTab({ client }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['client-returns', client.id],
+    queryFn: () => api.get(`/returns?clientId=${client.id}&limit=100`).then((r) => r.data),
+  });
+
+  const returns = data?.returns || [];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-40">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (returns.length === 0) {
+    return (
+      <div className="text-center py-16 border rounded-xl">
+        <RotateCcw className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+        <p className="font-medium">No returns yet</p>
+        <p className="text-sm text-muted-foreground mt-1">Returns from this client will appear here.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border rounded-xl overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-muted/40">
+          <tr>
+            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Return #</th>
+            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">From Sale</th>
+            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Items</th>
+            <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">Total</th>
+            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Date</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {returns.map((ret) => (
+            <tr key={ret.id} className="hover:bg-muted/20">
+              <td className="px-4 py-3 font-mono text-xs font-medium">{ret.returnNumber}</td>
+              <td className="px-4 py-3 text-xs text-muted-foreground">{ret.sale?.saleNumber || '—'}</td>
+              <td className="px-4 py-3 text-xs text-muted-foreground">{ret._count?.items}</td>
+              <td className="px-4 py-3 text-right font-semibold">{fmt(ret.totalAmount)}</td>
+              <td className="px-4 py-3 text-xs text-muted-foreground">{fmtDate(ret.returnDate)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 /* ─── Main Page ─── */
 export default function ClientDetailPage() {
   const { id } = useParams();
@@ -663,6 +719,7 @@ export default function ClientDetailPage() {
       {activeTab === 'activity'  && <ActivityTab client={client} />}
       {activeTab === 'ledger'    && <LedgerTab   client={client} />}
       {activeTab === 'items'     && <ItemsTab    client={client} />}
+      {activeTab === 'returns'   && <ReturnsTab  client={client} />}
 
       {/* Edit Dialog */}
       <Dialog open={showEdit} onOpenChange={setShowEdit}>
