@@ -120,39 +120,43 @@ async function deleteUser(req, res) {
   if (id === req.user.id) {
     return res.status(400).json({ message: 'Cannot delete your own account' });
   }
-  // Nullify all createdBy / userId references across tables before hard delete
+
+  // Only a few createdBy/userId columns are actually nullable in the schema;
+  // the rest (quotations, sales, projects, documents, service reports, etc.)
+  // require a non-null user reference, so a hard delete of a user with any
+  // real history there will always violate a FK constraint. Nullify the ones
+  // that can be, then attempt the delete.
   const nullifyTables = [
-    ['client_transactions', 'createdBy'],
-    ['clients',             'createdBy'],
-    ['contacts',            null],
-    ['quotations',          'createdBy'],
-    ['purchase_orders',     'createdBy'],
-    ['sales',               'createdBy'],
-    ['projects',            'createdBy'],
-    ['shipments',           'createdBy'],
-    ['documents',           'createdBy'],
-    ['approval_requests',   'requestedBy'],
-    ['approval_requests',   'reviewedBy'],
-    ['client_notes',        'createdBy'],
-    ['notifications',       'userId'],
-    ['site_visits',         'createdBy'],
-    ['work_logs',           'createdBy'],
-    ['service_reports',     'createdBy'],
-    ['inventory_transactions', 'createdBy'],
-    ['sale_items',          null],
-    ['audit_logs',          'userId'],
+    ['notifications', 'userId'],
+    ['audit_logs',    'userId'],
   ];
   for (const [table, col] of nullifyTables) {
-    if (!col) continue;
     try {
       await prisma.$executeRawUnsafe(`UPDATE "${table}" SET "${col}" = NULL WHERE "${col}" = ${id}`);
     } catch (_) {}
   }
   await prisma.base.refreshToken.deleteMany({ where: { userId: id } });
   try { await prisma.base.userRole.deleteMany({ where: { userId: id } }); } catch (_) {}
-  await prisma.base.user.delete({ where: { id } });
-  logAudit({ userId: req.user.id, action: 'DELETE', module: 'USERS', resourceId: id, resourceType: 'User', req });
-  res.json({ message: 'User deleted' });
+
+  try {
+    await prisma.base.user.delete({ where: { id } });
+    logAudit({ userId: req.user.id, action: 'DELETE', module: 'USERS', resourceId: id, resourceType: 'User', req });
+    return res.json({ message: 'User deleted' });
+  } catch (err) {
+    // FK constraint violation: this user has historical records (sales,
+    // projects, documents, etc.) that must keep a valid reference. Fall back
+    // to deactivating them instead — blocks login and hides them from active
+    // use without breaking referential integrity or audit history.
+    if (err.code === 'P2003' || err.code === 'P2014') {
+      await prisma.base.user.update({ where: { id }, data: { status: 'INACTIVE' } });
+      logAudit({ userId: req.user.id, action: 'DEACTIVATE', module: 'USERS', resourceId: id, resourceType: 'User', req });
+      return res.json({
+        message: 'This user has historical records (sales, projects, documents, etc.) and cannot be permanently deleted. Their account has been deactivated instead — they can no longer log in.',
+        deactivated: true,
+      });
+    }
+    throw err;
+  }
 }
 
 async function resetUserPassword(req, res) {

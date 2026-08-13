@@ -21,7 +21,11 @@ export default function UsersPage() {
 
   const deleteUser = useMutation({
     mutationFn: (id) => api.delete(`/users/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      if (res.data?.deactivated) alert(res.data.message);
+    },
+    onError: (err) => alert(err.response?.data?.message || 'Could not delete user'),
   });
 
   const filtered = users.filter(
