@@ -192,7 +192,11 @@ export default function SaleForm({ onSuccess, defaultValues, saleId }) {
             onSuccess={async (newClient) => {
               setShowAddClient(false);
               await queryClient.invalidateQueries({ queryKey: ['clients-simple'] });
-              if (newClient?.id) setValue('clientId', newClient.id);
+              // The refetched <option> isn't in the DOM the instant this
+              // promise resolves — React hasn't flushed the re-render yet —
+              // so setting the select's value here would silently no-op.
+              // Deferring one tick lets that render land first.
+              if (newClient?.id) setTimeout(() => setValue('clientId', newClient.id), 0);
             }}
           />
         </DialogContent>

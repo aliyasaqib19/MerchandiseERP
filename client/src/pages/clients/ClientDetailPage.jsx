@@ -128,7 +128,7 @@ function ContactsTab({ client }) {
   const addMutation = useMutation({
     mutationFn: (data) => api.post(`/clients/${client.id}/contacts`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['client', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['client', String(client.id)] });
       setShowAdd(false);
     },
   });
@@ -136,7 +136,7 @@ function ContactsTab({ client }) {
   const editMutation = useMutation({
     mutationFn: (data) => api.put(`/clients/${client.id}/contacts/${editing.id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['client', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['client', String(client.id)] });
       setEditing(null);
     },
   });
@@ -144,7 +144,7 @@ function ContactsTab({ client }) {
   const deleteMutation = useMutation({
     mutationFn: () => api.delete(`/clients/${client.id}/contacts/${deleting.id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['client', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['client', String(client.id)] });
       setDeleting(null);
     },
   });
@@ -256,14 +256,14 @@ function ActivityTab({ client }) {
   const noteMutation = useMutation({
     mutationFn: (content) => api.post(`/clients/${client.id}/notes`, { note: content }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['client', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['client', String(client.id)] });
       setNote('');
     },
   });
 
   const deleteNote = useMutation({
     mutationFn: (noteId) => api.delete(`/clients/${client.id}/notes/${noteId}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['client', client.id] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['client', String(client.id)] }),
   });
 
   const notes = [...(client.clientNotes || [])].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -340,7 +340,7 @@ function LedgerTab({ client }) {
     mutationFn: (data) => api.post(`/clients/${client.id}/transactions`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['client-ledger-preview', client.id] });
-      queryClient.invalidateQueries({ queryKey: ['client', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['client', String(client.id)] });
       setShowAddTx(false);
     },
   });

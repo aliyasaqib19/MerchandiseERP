@@ -4,7 +4,14 @@ const { PrismaPg } = require('@prisma/adapter-pg');
 const { getWarehouseId } = require('./warehouseContext');
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
-const basePrisma = new PrismaClient({ adapter });
+// Neon serverless connections can have cold-start/wake latency well past
+// Prisma's 5s default interactive-transaction timeout, which was causing
+// spurious 500s on otherwise-correct requests (e.g. stock-in). 20s gives
+// real headroom without masking genuinely stuck transactions.
+const basePrisma = new PrismaClient({
+  adapter,
+  transactionOptions: { maxWait: 20000, timeout: 20000 },
+});
 
 // Models that are scoped per warehouse. When an active warehouse is set on the
 // request context, reads are filtered by it and creates are tagged with it.
