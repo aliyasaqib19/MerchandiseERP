@@ -158,7 +158,12 @@ async function getOrCreatePlaceholderUser() {
   const existing = await prisma.base.user.findUnique({ where: { email: DELETED_USER_EMAIL } });
   if (existing) return existing;
 
-  const role = await prisma.base.role.findFirst({ orderBy: { id: 'asc' } });
+  // Deliberately avoid System Administrator — the account is INACTIVE so it
+  // can never log in, but it shouldn't hold an elevated role regardless.
+  const role = await prisma.base.role.findFirst({
+    where: { name: { not: 'System Administrator' } },
+    orderBy: { id: 'asc' },
+  });
   return prisma.base.user.create({
     data: {
       fullName: 'Deleted User',
