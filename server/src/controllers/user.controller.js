@@ -86,11 +86,16 @@ async function createUser(req, res) {
 }
 
 async function updateUser(req, res) {
-  const { fullName, phone, branchId, status, warehouseIds } = req.body;
+  const { fullName, email, phone, branchId, status, warehouseIds } = req.body;
   const id = Number(req.params.id);
   const rolesProvided = Array.isArray(req.body.roleIds) || req.body.roleId !== undefined;
   const { primary, extras } = normalizeRoleIds(req.body);
   if (rolesProvided && !primary) return res.status(400).json({ message: 'At least one role is required' });
+
+  if (email) {
+    const exists = await prisma.user.findUnique({ where: { email } });
+    if (exists && exists.id !== id) return res.status(409).json({ message: 'Email already in use' });
+  }
 
   const user = await prisma.$transaction(async (tx) => {
     if (rolesProvided) {
@@ -101,6 +106,7 @@ async function updateUser(req, res) {
       where: { id },
       data: {
         fullName,
+        email: email || undefined,
         phone,
         branchId: branchId ? Number(branchId) : null,
         roleId: rolesProvided ? primary : undefined,
@@ -112,7 +118,7 @@ async function updateUser(req, res) {
     });
   });
 
-  logAudit({ userId: req.user.id, action: 'UPDATE', module: 'USERS', resourceId: user.id, resourceType: 'User', newValues: { fullName, phone, roleIds: rolesProvided ? [primary, ...extras] : undefined, status }, req });
+  logAudit({ userId: req.user.id, action: 'UPDATE', module: 'USERS', resourceId: user.id, resourceType: 'User', newValues: { fullName, email, phone, roleIds: rolesProvided ? [primary, ...extras] : undefined, status }, req });
   res.json(shapeUser(user));
 }
 
