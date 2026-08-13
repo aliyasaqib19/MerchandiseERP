@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const prisma = require('../utils/prisma');
 const { logAudit } = require('./audit.controller');
 
@@ -115,56 +116,99 @@ async function updateUser(req, res) {
   res.json(shapeUser(user));
 }
 
+const DELETED_USER_EMAIL = 'deleted.user@system.internal';
+
+// Every table with a required (NOT NULL) FK to User, keyed by its actual
+// column name — several of these don't match the model's field name.
+const REQUIRED_USER_REFS = [
+  ['client_transactions', 'createdBy'],
+  ['clients',             'createdBy'],
+  ['client_notes',        'createdBy'],
+  ['quotations',          'createdBy'],
+  ['purchase_orders',     'createdBy'],
+  ['sales',                'createdBy'],
+  ['sales_returns',       'createdBy'],
+  ['demo_items',          'createdBy'],
+  ['projects',            'createdBy'],
+  ['projects',            'managerId'],
+  ['project_assignments', 'userId'],
+  ['project_assignments', 'assignedBy'],
+  ['site_visits',         'visitedBy'],
+  ['site_photos',         'uploadedBy'],
+  ['work_logs',           'userId'],
+  ['service_reports',     'generatedBy'],
+  ['approval_requests',   'requestedBy'],
+  ['documents',           'uploadedBy'],
+  ['document_versions',   'uploadedBy'],
+  ['shipments',           'createdBy'],
+  ['inventory_transactions', 'createdBy'],
+];
+
+// Nullable FK columns — just clear them, no placeholder needed.
+const NULLABLE_USER_REFS = [
+  ['approval_requests', 'assignedTo'],
+  ['approval_requests', 'decidedBy'],
+  ['audit_logs',        'userId'],
+];
+
+// Get (or lazily create) the placeholder account that historical records
+// get reassigned to when their original author is deleted. It's INACTIVE
+// so it can never log in.
+async function getOrCreatePlaceholderUser() {
+  const existing = await prisma.base.user.findUnique({ where: { email: DELETED_USER_EMAIL } });
+  if (existing) return existing;
+
+  const role = await prisma.base.role.findFirst({ orderBy: { id: 'asc' } });
+  return prisma.base.user.create({
+    data: {
+      fullName: 'Deleted User',
+      email: DELETED_USER_EMAIL,
+      passwordHash: await bcrypt.hash(crypto.randomUUID(), 12),
+      status: 'INACTIVE',
+      roleId: role.id,
+    },
+  });
+}
+
 async function deleteUser(req, res) {
   const id = Number(req.params.id);
   if (id === req.user.id) {
     return res.status(400).json({ message: 'Cannot delete your own account' });
   }
 
-  // Only a few createdBy/userId columns are actually nullable in the schema;
-  // the rest (quotations, sales, projects, documents, service reports, etc.)
-  // require a non-null user reference, so a hard delete of a user with any
-  // real history there will always violate a FK constraint. Nullify the ones
-  // that can be, then attempt the delete.
-  const nullifyTables = [
-    ['notifications', 'userId'],
-    ['audit_logs',    'userId'],
-  ];
-  for (const [table, col] of nullifyTables) {
+  const target = await prisma.base.user.findUnique({
+    where: { id },
+    include: { role: true, extraRoles: { include: { role: true } } },
+  });
+  if (!target) return res.status(404).json({ message: 'User not found' });
+
+  const roleNames = [target.role?.name, ...target.extraRoles.map((er) => er.role.name)];
+  if (roleNames.includes('System Administrator')) {
+    return res.status(400).json({ message: 'System Administrator accounts cannot be deleted.' });
+  }
+
+  const placeholder = await getOrCreatePlaceholderUser();
+
+  for (const [table, col] of REQUIRED_USER_REFS) {
+    if (target.id === placeholder.id) continue;
+    try {
+      await prisma.$executeRawUnsafe(
+        `UPDATE "${table}" SET "${col}" = ${placeholder.id} WHERE "${col}" = ${id}`
+      );
+    } catch (_) {}
+  }
+  for (const [table, col] of NULLABLE_USER_REFS) {
     try {
       await prisma.$executeRawUnsafe(`UPDATE "${table}" SET "${col}" = NULL WHERE "${col}" = ${id}`);
     } catch (_) {}
   }
+
   await prisma.base.refreshToken.deleteMany({ where: { userId: id } });
   try { await prisma.base.userRole.deleteMany({ where: { userId: id } }); } catch (_) {}
 
-  try {
-    await prisma.base.user.delete({ where: { id } });
-    logAudit({ userId: req.user.id, action: 'DELETE', module: 'USERS', resourceId: id, resourceType: 'User', req });
-    return res.json({ message: 'User deleted' });
-  } catch (err) {
-    // Any failure here is a foreign key constraint violation (Postgres
-    // "violates RESTRICT setting" / Prisma P2003) — the driver adapter
-    // doesn't always surface it as a typed PrismaClientKnownRequestError, so
-    // match on the underlying Postgres error rather than relying on err.code.
-    const isFkViolation =
-      err.code === 'P2003' ||
-      err.code === 'P2014' ||
-      err.code === '23503' ||
-      /foreign key constraint/i.test(err.message || '');
-    if (!isFkViolation) throw err;
-
-    // This user has historical records (sales, projects, documents, etc.)
-    // that must keep a valid reference. Fall back to deactivating them
-    // instead — blocks login and hides them from active use without
-    // breaking referential integrity or audit history.
-    await prisma.base.user.update({ where: { id }, data: { status: 'INACTIVE' } });
-    logAudit({ userId: req.user.id, action: 'DEACTIVATE', module: 'USERS', resourceId: id, resourceType: 'User', req });
-    return res.json({
-      message: 'This user has historical records (sales, projects, documents, etc.) and cannot be permanently deleted. Their account has been deactivated instead — they can no longer log in.',
-      deactivated: true,
-    });
-  }
+  await prisma.base.user.delete({ where: { id } });
+  logAudit({ userId: req.user.id, action: 'DELETE', module: 'USERS', resourceId: id, resourceType: 'User', req });
+  res.json({ message: 'User deleted' });
 }
 
 async function resetUserPassword(req, res) {
