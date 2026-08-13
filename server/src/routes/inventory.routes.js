@@ -32,7 +32,7 @@ router.post('/products',
   [
     body('sku').notEmpty().trim(),
     body('name').notEmpty().trim(),
-    body('categoryId').isInt({ min: 1 }),
+    body('categoryId').optional({ checkFalsy: true }).isInt({ min: 1 }),
   ],
   validate,
   ctrl.createProduct
