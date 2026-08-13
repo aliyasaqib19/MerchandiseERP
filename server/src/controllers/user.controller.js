@@ -143,19 +143,27 @@ async function deleteUser(req, res) {
     logAudit({ userId: req.user.id, action: 'DELETE', module: 'USERS', resourceId: id, resourceType: 'User', req });
     return res.json({ message: 'User deleted' });
   } catch (err) {
-    // FK constraint violation: this user has historical records (sales,
-    // projects, documents, etc.) that must keep a valid reference. Fall back
-    // to deactivating them instead — blocks login and hides them from active
-    // use without breaking referential integrity or audit history.
-    if (err.code === 'P2003' || err.code === 'P2014') {
-      await prisma.base.user.update({ where: { id }, data: { status: 'INACTIVE' } });
-      logAudit({ userId: req.user.id, action: 'DEACTIVATE', module: 'USERS', resourceId: id, resourceType: 'User', req });
-      return res.json({
-        message: 'This user has historical records (sales, projects, documents, etc.) and cannot be permanently deleted. Their account has been deactivated instead — they can no longer log in.',
-        deactivated: true,
-      });
-    }
-    throw err;
+    // Any failure here is a foreign key constraint violation (Postgres
+    // "violates RESTRICT setting" / Prisma P2003) — the driver adapter
+    // doesn't always surface it as a typed PrismaClientKnownRequestError, so
+    // match on the underlying Postgres error rather than relying on err.code.
+    const isFkViolation =
+      err.code === 'P2003' ||
+      err.code === 'P2014' ||
+      err.code === '23503' ||
+      /foreign key constraint/i.test(err.message || '');
+    if (!isFkViolation) throw err;
+
+    // This user has historical records (sales, projects, documents, etc.)
+    // that must keep a valid reference. Fall back to deactivating them
+    // instead — blocks login and hides them from active use without
+    // breaking referential integrity or audit history.
+    await prisma.base.user.update({ where: { id }, data: { status: 'INACTIVE' } });
+    logAudit({ userId: req.user.id, action: 'DEACTIVATE', module: 'USERS', resourceId: id, resourceType: 'User', req });
+    return res.json({
+      message: 'This user has historical records (sales, projects, documents, etc.) and cannot be permanently deleted. Their account has been deactivated instead — they can no longer log in.',
+      deactivated: true,
+    });
   }
 }
 
