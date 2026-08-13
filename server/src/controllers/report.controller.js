@@ -3,7 +3,11 @@ const prisma = require('../utils/prisma');
 async function salesReport(req, res, next) {
   try {
     const { from, to } = req.query;
-    const where = { status: 'CONFIRMED' };
+    // A sale is realized revenue once confirmed — DELIVERED is just the
+    // fulfillment stage after that, not a separate revenue event. Excluding
+    // it here undercounts almost everything, since confirmed sales move to
+    // DELIVERED as soon as they're fulfilled.
+    const where = { status: { in: ['CONFIRMED', 'DELIVERED'] } };
     if (from || to) {
       where.saleDate = {};
       if (from) where.saleDate.gte = new Date(from);
@@ -57,7 +61,7 @@ async function salesReport(req, res, next) {
 
 async function inventoryReport(req, res, next) {
   try {
-    const [products, lowStock, categories, movementSummary] = await Promise.all([
+    const [products, lowStock, categoryCounts, categoryNames, movementSummary] = await Promise.all([
       prisma.product.aggregate({
         _count: { id: true },
         _sum: { quantity: true },
@@ -66,15 +70,29 @@ async function inventoryReport(req, res, next) {
       prisma.product.count({
         where: { status: 'ACTIVE', quantity: { lte: prisma.product.fields.minThreshold } },
       }).catch(() => 0),
-      prisma.category.findMany({
-        select: { id: true, name: true, _count: { select: { products: true } } },
+      // Prisma's nested relation _count (Category -> products) bypasses the
+      // warehouse-scoping query extension entirely, since it isn't a
+      // top-level Product operation — it would silently count products
+      // across every warehouse instead of just the active one. Count
+      // through Product directly so scoping applies.
+      prisma.product.groupBy({
+        by: ['categoryId'],
+        where: { status: 'ACTIVE' },
+        _count: { id: true },
       }),
+      prisma.category.findMany({ select: { id: true, name: true } }),
       prisma.inventoryTransaction.groupBy({
         by: ['type'],
         _sum: { quantity: true },
         _count: { id: true },
       }),
     ]);
+    const categoryNameMap = Object.fromEntries(categoryNames.map((c) => [c.id, c.name]));
+    const categories = categoryCounts.map((c) => ({
+      id: c.categoryId,
+      name: categoryNameMap[c.categoryId] || 'Unknown',
+      productCount: c._count.id,
+    }));
 
     const stockValue = await prisma.product.findMany({
       where: { status: 'ACTIVE' },
@@ -90,7 +108,7 @@ async function inventoryReport(req, res, next) {
         totalCostValue,
         totalSellingValue,
       },
-      categories: categories.map((c) => ({ id: c.id, name: c.name, productCount: c._count.products })),
+      categories,
       movementSummary,
     });
   } catch (err) { next(err); }
