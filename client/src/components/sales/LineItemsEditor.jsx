@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useFieldArray, useWatch } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
@@ -23,6 +24,24 @@ export function LineItemsEditor({ control, register, setValue, showDiscount = tr
   });
 
   const watchedItems = useWatch({ control, name: 'items' }) || [];
+
+  // Same issue as the client picker in SaleForm: the product <select>
+  // renders empty until this query resolves, so a line item edited from an
+  // existing sale/quotation keeps its real productId in RHF's internal
+  // state but the <select> never visually reflects it (no matching <option>
+  // existed at mount). If left alone, saving without touching the dropdown
+  // would submit productId as unset and delink the line item from its
+  // product. Once options exist, re-push each row's already-correct value
+  // through setValue so the DOM catches up.
+  const productDefaultsApplied = useRef(false);
+  useEffect(() => {
+    if (!productDefaultsApplied.current && products.length && watchedItems.some((i) => i?.productId)) {
+      watchedItems.forEach((item, index) => {
+        if (item?.productId) setValue(`items.${index}.productId`, item.productId);
+      });
+      productDefaultsApplied.current = true;
+    }
+  }, [products, watchedItems, setValue]);
 
   function onProductChange(index, productId) {
     const product = products.find((p) => p.id === Number(productId));

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -64,6 +64,18 @@ export default function SaleForm({ onSuccess, defaultValues, saleId }) {
       })) || [{ productId: '', description: '', quantity: 1, unitPrice: 0, costPrice: 0, discount: 0 }],
     },
   });
+
+  // The client <select> renders with only its placeholder option until this
+  // query resolves, so RHF's defaultValues (applied at mount) can't select
+  // an <option> that doesn't exist yet — the browser silently no-ops. Once
+  // the real options are in the DOM, re-apply the client id once.
+  const clientDefaultApplied = useRef(false);
+  useEffect(() => {
+    if (!clientDefaultApplied.current && defaultValues?.clientId && clients.length) {
+      setValue('clientId', defaultValues.clientId);
+      clientDefaultApplied.current = true;
+    }
+  }, [clients, defaultValues, setValue]);
 
   const watchedItems    = useWatch({ control, name: 'items' }) || [];
   const discountAmount  = parseFloat(useWatch({ control, name: 'discountAmount' })) || 0;
