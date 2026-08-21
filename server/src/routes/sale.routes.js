@@ -40,4 +40,25 @@ router.patch('/:id/challan-file',
   ctrl.uploadChallanFile
 );
 
+router.patch('/:id/invoice-file',
+  authorize('SALES_UPDATE'),
+  [body('fileUrl').notEmpty()],
+  validate,
+  ctrl.uploadInvoiceFile
+);
+
+router.patch('/:id/invoice-status',
+  authorize('SALES_UPDATE'),
+  [body('uploaded').isBoolean()],
+  validate,
+  ctrl.setInvoiceStatus
+);
+
+router.patch('/:id/challan-status',
+  authorize('SALES_UPDATE'),
+  [body('uploaded').isBoolean()],
+  validate,
+  ctrl.setChallanStatus
+);
+
 module.exports = router;

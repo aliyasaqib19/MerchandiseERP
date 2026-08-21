@@ -150,7 +150,23 @@ async function getProduct(req, res) {
     },
   });
   if (!product) return res.status(404).json({ message: 'Product not found' });
-  res.json(product);
+
+  // Products aren't reliably matched across warehouses by anything but an
+  // exact name (SKUs and prices are entered independently per warehouse,
+  // sometimes by different people) — so this is a manual reference view,
+  // not an automatic link. Never auto-synced; just makes divergent prices
+  // visible so a person can decide what to update.
+  const otherWarehouseCopies = await prisma.base.product.findMany({
+    where: { name: product.name, id: { not: product.id } },
+    select: {
+      id: true, sku: true, quantity: true, unitType: true, costPrice: true, sellingPrice: true,
+      warehouse: { select: { id: true, name: true } },
+      brand: { select: { id: true, name: true } },
+    },
+    orderBy: { warehouseId: 'asc' },
+  });
+
+  res.json({ ...product, otherWarehouseCopies });
 }
 
 async function createProduct(req, res) {

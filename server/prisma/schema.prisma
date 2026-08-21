@@ -430,6 +430,12 @@ model Sale {
   deliveryChallanNumber String?
   challanFileUrl        String?
   challanFileName       String?
+  challanUploaded       Boolean    @default(false)
+  challanUploadedAt     DateTime?
+  invoiceFileUrl        String?
+  invoiceFileName       String?
+  invoiceUploaded       Boolean    @default(false)
+  invoiceUploadedAt     DateTime?
   subtotal              Float      @default(0)
   discountAmount        Float      @default(0)
   taxRate               Float      @default(0)

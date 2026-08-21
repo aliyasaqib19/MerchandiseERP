@@ -333,11 +333,65 @@ async function uploadChallanFile(req, res) {
 
   const sale = await prisma.base.sale.update({
     where: { id },
-    data: { challanFileUrl: fileUrl, challanFileName: fileName || null },
+    // Uploading a file is itself the clearest signal the challan is done,
+    // so it marks the status automatically; the manual toggle below still
+    // lets a user mark/unmark it without touching the file.
+    data: { challanFileUrl: fileUrl, challanFileName: fileName || null, challanUploaded: true, challanUploadedAt: new Date() },
     include: SALE_INCLUDE,
   });
 
   logAudit({ userId: req.user.id, action: 'UPDATE', module: 'SALES', resourceId: id, resourceType: 'Sale', newValues: { challanFileName: fileName }, req });
+  res.json(sale);
+}
+
+async function uploadInvoiceFile(req, res) {
+  const id = Number(req.params.id);
+  const { fileUrl, fileName } = req.body;
+
+  const existing = await prisma.sale.findUnique({ where: { id } });
+  if (!existing) return res.status(404).json({ message: 'Not found' });
+
+  const sale = await prisma.base.sale.update({
+    where: { id },
+    data: { invoiceFileUrl: fileUrl, invoiceFileName: fileName || null, invoiceUploaded: true, invoiceUploadedAt: new Date() },
+    include: SALE_INCLUDE,
+  });
+
+  logAudit({ userId: req.user.id, action: 'UPDATE', module: 'SALES', resourceId: id, resourceType: 'Sale', newValues: { invoiceFileName: fileName }, req });
+  res.json(sale);
+}
+
+async function setInvoiceStatus(req, res) {
+  const id = Number(req.params.id);
+  const uploaded = !!req.body.uploaded;
+
+  const existing = await prisma.sale.findUnique({ where: { id } });
+  if (!existing) return res.status(404).json({ message: 'Not found' });
+
+  const sale = await prisma.base.sale.update({
+    where: { id },
+    data: { invoiceUploaded: uploaded, invoiceUploadedAt: uploaded ? new Date() : null },
+    include: SALE_INCLUDE,
+  });
+
+  logAudit({ userId: req.user.id, action: 'UPDATE', module: 'SALES', resourceId: id, resourceType: 'Sale', newValues: { invoiceUploaded: uploaded }, req });
+  res.json(sale);
+}
+
+async function setChallanStatus(req, res) {
+  const id = Number(req.params.id);
+  const uploaded = !!req.body.uploaded;
+
+  const existing = await prisma.sale.findUnique({ where: { id } });
+  if (!existing) return res.status(404).json({ message: 'Not found' });
+
+  const sale = await prisma.base.sale.update({
+    where: { id },
+    data: { challanUploaded: uploaded, challanUploadedAt: uploaded ? new Date() : null },
+    include: SALE_INCLUDE,
+  });
+
+  logAudit({ userId: req.user.id, action: 'UPDATE', module: 'SALES', resourceId: id, resourceType: 'Sale', newValues: { challanUploaded: uploaded }, req });
   res.json(sale);
 }
 
@@ -499,4 +553,5 @@ module.exports = {
   getDashboardStats,
   getSales, getSale, createSale, updateSale, deleteSale,
   confirmSale, deliverSale, cancelSale, reopenSale, uploadChallanFile,
+  uploadInvoiceFile, setInvoiceStatus, setChallanStatus,
 };

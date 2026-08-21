@@ -144,6 +144,48 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
+      {/* Same-named products in other warehouses (reference only, not linked) */}
+      {product.otherWarehouseCopies?.length > 0 && (
+        <div className="border rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b bg-muted/30">
+            <h3 className="font-semibold">Same Product in Other Warehouses</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Each warehouse tracks its own stock and price for a product with this name. Nothing here updates automatically — review and edit each one yourself if prices should match.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40">
+                <tr>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Warehouse</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">SKU</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Brand</th>
+                  <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Stock</th>
+                  <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Cost Price</th>
+                  <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Selling Price</th>
+                  <th className="px-4 py-2.5" />
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {product.otherWarehouseCopies.map((p) => (
+                  <tr key={p.id} className="hover:bg-muted/20">
+                    <td className="px-4 py-2.5">{p.warehouse?.name || '—'}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs">{p.sku}</td>
+                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{p.brand?.name || '—'}</td>
+                    <td className="px-4 py-2.5 text-right">{p.quantity} {p.unitType}</td>
+                    <td className="px-4 py-2.5 text-right">{p.costPrice ? `Rs. ${p.costPrice.toFixed(2)}` : '—'}</td>
+                    <td className="px-4 py-2.5 text-right">{p.sellingPrice ? `Rs. ${p.sellingPrice.toFixed(2)}` : '—'}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <Link to={`/inventory/products/${p.id}`} className="text-xs text-primary hover:underline">View →</Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Transaction History */}
       <div className="border rounded-xl overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b">

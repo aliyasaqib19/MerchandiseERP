@@ -77,6 +77,33 @@ function SaleDetail({ sale, onClose, onRefresh, onReopened, onRemoved }) {
     reader.readAsDataURL(file);
   }
 
+  const [invoiceUploadError, setInvoiceUploadError] = useState('');
+  const invoiceUploadMutation = useMutation({
+    mutationFn: ({ fileUrl, fileName }) => api.patch(`/sales/${sale.id}/invoice-file`, { fileUrl, fileName }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sales'] }); onRefresh(); },
+    onError: (err) => setInvoiceUploadError(err.response?.data?.message || 'Failed to upload file'),
+  });
+
+  function onInvoiceFileChange(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    setInvoiceUploadError('');
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { setInvoiceUploadError('File must be under 10 MB.'); return; }
+    const reader = new FileReader();
+    reader.onload = () => invoiceUploadMutation.mutate({ fileUrl: reader.result, fileName: file.name });
+    reader.readAsDataURL(file);
+  }
+
+  const invoiceStatusMutation = useMutation({
+    mutationFn: (uploaded) => api.patch(`/sales/${sale.id}/invoice-status`, { uploaded }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sales'] }); onRefresh(); },
+  });
+  const challanStatusMutation = useMutation({
+    mutationFn: (uploaded) => api.patch(`/sales/${sale.id}/challan-status`, { uploaded }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sales'] }); onRefresh(); },
+  });
+
   const s = sale;
 
   return (
@@ -93,20 +120,74 @@ function SaleDetail({ sale, onClose, onRefresh, onReopened, onRemoved }) {
       </div>
 
       {canUpdate && (
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 text-xs border border-dashed rounded-lg px-3 py-2 cursor-pointer hover:bg-muted/40 transition-colors">
-            {uploadMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-            {s.challanFileUrl ? 'Replace Challan File' : 'Upload Challan File'}
-            <input type="file" accept="image/*,application/pdf" className="hidden" onChange={onChallanFileChange} disabled={uploadMutation.isPending} />
-          </label>
-          {s.challanFileUrl && (
-            <a href={s.challanFileUrl} target="_blank" rel="noreferrer" download={s.challanFileName || 'challan'} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-              <FileText className="w-3.5 h-3.5" /> {s.challanFileName || 'View file'}
-            </a>
-          )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Delivery Challan */}
+          <div className="border rounded-lg p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium">Delivery Challan</span>
+              {s.challanUploaded && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                  <CheckCircle2 className="w-3 h-3" /> Uploaded
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <label className="flex items-center gap-1.5 text-xs border border-dashed rounded-lg px-3 py-2 cursor-pointer hover:bg-muted/40 transition-colors">
+                {uploadMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                {s.challanFileUrl ? 'Replace File' : 'Upload File'}
+                <input type="file" accept="image/*,application/pdf" className="hidden" onChange={onChallanFileChange} disabled={uploadMutation.isPending} />
+              </label>
+              {s.challanFileUrl && (
+                <a href={s.challanFileUrl} target="_blank" rel="noreferrer" download={s.challanFileName || 'challan'} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                  <FileText className="w-3.5 h-3.5" /> {s.challanFileName || 'View file'}
+                </a>
+              )}
+            </div>
+            {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
+            <button
+              type="button"
+              disabled={challanStatusMutation.isPending}
+              onClick={() => challanStatusMutation.mutate(!s.challanUploaded)}
+              className="text-xs text-primary hover:underline"
+            >
+              {s.challanUploaded ? 'Mark as not uploaded' : 'Mark as Challan Uploaded'}
+            </button>
+          </div>
+
+          {/* Invoice */}
+          <div className="border rounded-lg p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium">Invoice</span>
+              {s.invoiceUploaded && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                  <CheckCircle2 className="w-3 h-3" /> Uploaded
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <label className="flex items-center gap-1.5 text-xs border border-dashed rounded-lg px-3 py-2 cursor-pointer hover:bg-muted/40 transition-colors">
+                {invoiceUploadMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                {s.invoiceFileUrl ? 'Replace File' : 'Upload File'}
+                <input type="file" accept="image/*,application/pdf" className="hidden" onChange={onInvoiceFileChange} disabled={invoiceUploadMutation.isPending} />
+              </label>
+              {s.invoiceFileUrl && (
+                <a href={s.invoiceFileUrl} target="_blank" rel="noreferrer" download={s.invoiceFileName || 'invoice'} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                  <FileText className="w-3.5 h-3.5" /> {s.invoiceFileName || 'View file'}
+                </a>
+              )}
+            </div>
+            {invoiceUploadError && <p className="text-xs text-destructive">{invoiceUploadError}</p>}
+            <button
+              type="button"
+              disabled={invoiceStatusMutation.isPending}
+              onClick={() => invoiceStatusMutation.mutate(!s.invoiceUploaded)}
+              className="text-xs text-primary hover:underline"
+            >
+              {s.invoiceUploaded ? 'Mark as not uploaded' : 'Mark as Invoice Uploaded'}
+            </button>
+          </div>
         </div>
       )}
-      {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
 
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div><span className="text-muted-foreground">Sale Date:</span> {fmtDate(s.saleDate)}</div>
@@ -366,6 +447,7 @@ export default function SalesOrdersPage() {
               <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Sale #</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Client</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Delivery Challan</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Docs</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Items</th>
               <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">Total</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Date</th>
@@ -376,11 +458,11 @@ export default function SalesOrdersPage() {
           <tbody className="divide-y">
             {isLoading ? (
               [...Array(5)].map((_, i) => (
-                <tr key={i}>{[...Array(8)].map((_, j) => <td key={j} className="px-4 py-3"><div className="h-4 bg-muted animate-pulse rounded" /></td>)}</tr>
+                <tr key={i}>{[...Array(9)].map((_, j) => <td key={j} className="px-4 py-3"><div className="h-4 bg-muted animate-pulse rounded" /></td>)}</tr>
               ))
             ) : sales.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-10">
+                <td colSpan={9} className="text-center py-10">
                   <Package className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
                   <p className="text-muted-foreground text-sm">No sales orders found</p>
                 </td>
@@ -391,6 +473,26 @@ export default function SalesOrdersPage() {
                   <td className="px-4 py-3 font-mono text-xs font-medium">{sale.saleNumber}</td>
                   <td className="px-4 py-3 font-medium">{sale.client?.companyName}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{sale.deliveryChallanNumber || '—'}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        title={sale.invoiceUploaded ? 'Invoice uploaded' : 'Invoice not uploaded'}
+                        className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                          sale.invoiceUploaded ? 'bg-blue-100 text-blue-700' : 'bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-3 h-3" /> Inv
+                      </span>
+                      <span
+                        title={sale.challanUploaded ? 'Delivery challan uploaded' : 'Delivery challan not uploaded'}
+                        className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                          sale.challanUploaded ? 'bg-blue-100 text-blue-700' : 'bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-3 h-3" /> DC
+                      </span>
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{sale._count?.items}</td>
                   <td className="px-4 py-3 text-right font-semibold">{fmt(sale.totalAmount)}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{fmtDate(sale.saleDate)}</td>
