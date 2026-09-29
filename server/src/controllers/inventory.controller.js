@@ -171,6 +171,9 @@ async function getProduct(req, res) {
 
 async function createProduct(req, res) {
   const { sku, name, description, categoryId, brandId, unitType, quantity, minThreshold, costPrice, sellingPrice, status, imageUrl } = req.body;
+  // Low-stock threshold is a System Administrator setting — anyone else's
+  // value is silently ignored rather than rejecting the whole request.
+  const isAdmin = (req.user.roleNames || []).includes('System Administrator');
 
   const exists = await prisma.product.findUnique({ where: { sku } });
   if (exists) return res.status(409).json({ message: 'SKU already exists' });
@@ -196,7 +199,7 @@ async function createProduct(req, res) {
         brandId: brandId ? Number(brandId) : null,
         unitType: unitType || 'PIECE',
         quantity: initialQty,
-        minThreshold: Number(minThreshold) || 0,
+        minThreshold: isAdmin ? (Number(minThreshold) || 0) : 0,
         costPrice: costPrice ? Number(costPrice) : null,
         sellingPrice: sellingPrice ? Number(sellingPrice) : null,
         status: status || 'ACTIVE',
@@ -230,6 +233,9 @@ async function createProduct(req, res) {
 
 async function updateProduct(req, res) {
   const { name, description, categoryId, brandId, unitType, minThreshold, costPrice, sellingPrice, status, imageUrl } = req.body;
+  // Low-stock threshold is a System Administrator setting — a non-admin's
+  // request just leaves the existing value alone rather than being rejected.
+  const isAdmin = (req.user.roleNames || []).includes('System Administrator');
 
   const product = await prisma.product.update({
     where: { id: Number(req.params.id) },
@@ -239,7 +245,7 @@ async function updateProduct(req, res) {
       categoryId: categoryId ? Number(categoryId) : undefined,
       brandId: brandId !== undefined ? (brandId ? Number(brandId) : null) : undefined,
       unitType,
-      minThreshold: minThreshold !== undefined ? Number(minThreshold) : undefined,
+      minThreshold: (isAdmin && minThreshold !== undefined) ? Number(minThreshold) : undefined,
       costPrice: costPrice !== undefined ? (costPrice ? Number(costPrice) : null) : undefined,
       sellingPrice: sellingPrice !== undefined ? (sellingPrice ? Number(sellingPrice) : null) : undefined,
       status,

@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import {
@@ -23,10 +23,19 @@ const STATUS_VARIANT = { ACTIVE: 'success', INACTIVE: 'secondary', DISCONTINUED:
 export default function ProductListPage() {
   const queryClient = useQueryClient();
   const { canEdit } = useWarehouseAccess();
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('ACTIVE');
-  const [lowStockOnly, setLowStockOnly] = useState(false);
+  const [lowStockOnly, setLowStockOnly] = useState(() => searchParams.get('lowStock') === 'true');
+
+  // A client-side navigation to this same route (e.g. the dashboard's Low
+  // Stock link, clicked while this page is already mounted) changes the URL
+  // without remounting the component, so the useState initializer above
+  // never re-runs — keep it in sync on every navigation instead.
+  useEffect(() => {
+    setLowStockOnly(searchParams.get('lowStock') === 'true');
+  }, [searchParams]);
 
   const [showCreate, setShowCreate] = useState(false);
   const [editProduct, setEditProduct] = useState(null);

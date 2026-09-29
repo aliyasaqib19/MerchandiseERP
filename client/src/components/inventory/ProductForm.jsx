@@ -9,6 +9,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select } from '../ui/select';
 import api from '../../lib/api';
+import { useAuthStore } from '../../store/authStore';
 
 const schema = z.object({
   sku: z.string().min(2, 'Manufacture number is required').toUpperCase(),
@@ -33,6 +34,8 @@ const UNIT_TYPES = ['PIECE', 'METER', 'KG', 'LITER', 'BOX', 'ROLL', 'SET'];
 export default function ProductForm({ onSuccess, defaultValues, productId, lockBrand }) {
   const isEdit = !!productId;
   const queryClient = useQueryClient();
+  const roles = useAuthStore((s) => s.user?.roles || (s.user?.role ? [s.user.role] : []));
+  const isAdmin = roles.includes('System Administrator');
   const [image, setImage] = useState(defaultValues?.imageUrl || '');
   const [imageError, setImageError] = useState('');
   const [showNewBrand, setShowNewBrand] = useState(false);
@@ -255,11 +258,17 @@ export default function ProductForm({ onSuccess, defaultValues, productId, lockB
           </div>
         )}
 
-        {/* Min Threshold */}
+        {/* Min Threshold — System Administrator only */}
         <div className="space-y-1.5">
           <Label>Min. Stock Threshold</Label>
-          <Input type="number" min="0" step="0.01" placeholder="0" {...register('minThreshold')} />
-          <p className="text-xs text-muted-foreground">Alert when stock falls below this</p>
+          <Input
+            type="number" min="0" step="0.01" placeholder="0"
+            disabled={!isAdmin}
+            {...register('minThreshold')}
+          />
+          <p className="text-xs text-muted-foreground">
+            {isAdmin ? 'Alert when stock falls below this' : 'Only a System Administrator can change this'}
+          </p>
         </div>
 
         {/* Cost Price */}

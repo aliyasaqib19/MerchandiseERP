@@ -49,6 +49,7 @@ async function listShipments(req, res) {
       destWarehouse: { select: { id: true, name: true } },
       createdByUser: { select: { id: true, fullName: true } },
       _count: { select: { items: true } },
+      items: { select: { description: true, quantity: true } },
     },
     orderBy: { createdAt: 'desc' },
   });

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Truck, Plus, ArrowRight, ArrowUpRight, ArrowDownLeft, Trash2, Loader2,
-  Check, X, ClipboardCheck, Package, Upload, FileText,
+  Check, X, ClipboardCheck, Package, Upload, FileText, Search,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -33,7 +33,11 @@ function CreateShipmentModal({ onClose }) {
   const activeWarehouse = useWarehouseStore((s) => s.activeWarehouse);
   const [destWarehouseId, setDestWarehouseId] = useState('');
   const [notes, setNotes] = useState('');
-  const [rows, setRows] = useState([{ productId: '', quantity: '' }]);
+  const [rows, setRows] = useState([{ productId: '', quantity: '', search: '' }]);
+  const [newItemRow, setNewItemRow] = useState(null); // index of row showing the quick-create form
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemSku, setNewItemSku] = useState('');
+  const [newItemError, setNewItemError] = useState('');
 
   const { data: warehouses = [] } = useQuery({
     queryKey: ['warehouses'],
@@ -53,11 +57,52 @@ function CreateShipmentModal({ onClose }) {
     },
   });
 
+  const createProductMutation = useMutation({
+    mutationFn: ({ rowIndex, ...data }) => api.post('/inventory/products', data).then((r) => r.data),
+    onSuccess: (product, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-products'] });
+      updateRow(variables.rowIndex, 'productId', String(product.id));
+      updateRow(variables.rowIndex, 'search', product.name);
+      setNewItemRow(null);
+      setNewItemName('');
+      setNewItemSku('');
+      setNewItemError('');
+    },
+    onError: (e) => setNewItemError(e?.response?.data?.message || 'Could not create item'),
+  });
+
   const destOptions = warehouses.filter((w) => w.id !== activeWarehouse?.id);
 
   const updateRow = (i, key, val) => setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, [key]: val } : r)));
-  const addRow = () => setRows((rs) => [...rs, { productId: '', quantity: '' }]);
+  const addRow = () => setRows((rs) => [...rs, { productId: '', quantity: '', search: '' }]);
   const removeRow = (i) => setRows((rs) => rs.filter((_, idx) => idx !== i));
+
+  function matchesFor(search) {
+    const q = search.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
+  }
+
+  function openQuickCreate(i) {
+    setNewItemRow(i);
+    setNewItemName(rows[i].search);
+    setNewItemSku('');
+    setNewItemError('');
+  }
+
+  function submitQuickCreate(e) {
+    e.preventDefault();
+    if (!newItemName.trim() || !newItemSku.trim()) { setNewItemError('Name and SKU are both required.'); return; }
+    // If it's being shipped, this warehouse must physically have at least
+    // that many units — seed the new product's stock with the shipment
+    // quantity so the shipment can actually be received later instead of
+    // failing with "insufficient stock" against a freshly-created 0 count.
+    const shippedQty = Number(rows[newItemRow]?.quantity) || 0;
+    createProductMutation.mutate({
+      rowIndex: newItemRow,
+      sku: newItemSku.trim(), name: newItemName.trim(), unitType: 'PIECE', quantity: shippedQty,
+    });
+  }
 
   function submit(e) {
     e.preventDefault();
@@ -91,20 +136,74 @@ function CreateShipmentModal({ onClose }) {
           <div>
             <label className="text-sm font-medium mb-2 block">Items</label>
             <div className="space-y-2">
-              {rows.map((row, i) => (
-                <div key={i} className="flex gap-2 items-center">
-                  <Select className="flex-1" value={row.productId} onChange={(e) => updateRow(i, 'productId', e.target.value)}>
-                    <option value="">Select product…</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.quantity} {p.unitType} in stock)</option>
-                    ))}
-                  </Select>
-                  <Input type="number" min="1" placeholder="Qty" className="w-24" value={row.quantity} onChange={(e) => updateRow(i, 'quantity', e.target.value)} />
-                  <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => removeRow(i)} disabled={rows.length === 1}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
+              {rows.map((row, i) => {
+                const matches = matchesFor(row.search);
+                return (
+                  <div key={i} className="space-y-1.5">
+                    <div className="flex gap-2 items-center">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                        <Input
+                          className="pl-8"
+                          placeholder="Search product by name or SKU…"
+                          value={row.search}
+                          onChange={(e) => { updateRow(i, 'search', e.target.value); updateRow(i, 'productId', ''); }}
+                        />
+                      </div>
+                      <Input type="number" min="1" placeholder="Qty" className="w-24" value={row.quantity} onChange={(e) => updateRow(i, 'quantity', e.target.value)} />
+                      <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => removeRow(i)} disabled={rows.length === 1}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+
+                    {row.search && !row.productId && (
+                      matches.length > 0 ? (
+                        <div className="ml-1 border rounded-md divide-y max-h-32 overflow-y-auto">
+                          {matches.slice(0, 8).map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              className="w-full text-left px-2.5 py-1.5 text-xs hover:bg-muted/50"
+                              onClick={() => { updateRow(i, 'productId', String(p.id)); updateRow(i, 'search', p.name); }}
+                            >
+                              {p.name} <span className="text-muted-foreground">({p.sku} · {p.quantity} {p.unitType} in stock)</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="ml-1 flex items-center gap-2">
+                          <p className="text-xs text-muted-foreground">No product matches "{row.search}".</p>
+                          <button
+                            type="button"
+                            className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                            onClick={() => openQuickCreate(i)}
+                          >
+                            <Plus className="w-3 h-3" /> Create New Item
+                          </button>
+                        </div>
+                      )
+                    )}
+
+                    {newItemRow === i && (
+                      <div className="ml-1 border rounded-md p-3 space-y-2 bg-muted/30">
+                        <p className="text-xs font-medium">New item</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input placeholder="Item name" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} />
+                          <Input placeholder="SKU / manufacture no." value={newItemSku} onChange={(e) => setNewItemSku(e.target.value)} />
+                        </div>
+                        {newItemError && <p className="text-xs text-destructive">{newItemError}</p>}
+                        <div className="flex gap-2">
+                          <Button type="button" size="sm" onClick={submitQuickCreate} disabled={createProductMutation.isPending}>
+                            {createProductMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                            Create & Select
+                          </Button>
+                          <Button type="button" size="sm" variant="outline" onClick={() => { setNewItemRow(null); setNewItemError(''); }}>Cancel</Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
             <Button type="button" variant="outline" size="sm" className="mt-2" onClick={addRow}>
               <Plus className="w-3.5 h-3.5" /> Add Item
@@ -206,6 +305,7 @@ export default function ShipmentsPage() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const [showCreate, setShowCreate] = useState(false);
   const [detailsFor, setDetailsFor] = useState(null);
+  const [search, setSearch] = useState('');
 
   const { canEdit } = useWarehouseAccess();
   // Mutating actions require write access to the active warehouse (view-only elsewhere).
@@ -217,6 +317,16 @@ export default function ShipmentsPage() {
     queryKey: ['shipments'],
     queryFn: () => api.get('/shipments').then((r) => r.data),
   });
+
+  const q = search.trim().toLowerCase();
+  const filteredShipments = q
+    ? shipments.filter((s) =>
+        s.shipmentNumber?.toLowerCase().includes(q) ||
+        s.consignmentNumber?.toLowerCase().includes(q) ||
+        s.sourceWarehouse?.name?.toLowerCase().includes(q) ||
+        s.destWarehouse?.name?.toLowerCase().includes(q)
+      )
+    : shipments;
 
   const action = useMutation({
     mutationFn: ({ id, verb }) => api.post(`/shipments/${id}/${verb}`).then((r) => r.data),
@@ -304,6 +414,16 @@ export default function ShipmentsPage() {
         )}
       </div>
 
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          className="pl-9"
+          placeholder="Search by shipment #, consignment #, or warehouse..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
       <div className="border rounded-xl overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-muted/40">
@@ -324,15 +444,15 @@ export default function ShipmentsPage() {
               [...Array(4)].map((_, i) => (
                 <tr key={i}>{[...Array(9)].map((_, j) => <td key={j} className="px-4 py-3"><div className="h-4 bg-muted animate-pulse rounded" /></td>)}</tr>
               ))
-            ) : shipments.length === 0 ? (
+            ) : filteredShipments.length === 0 ? (
               <tr>
                 <td colSpan={9} className="text-center py-12 text-muted-foreground">
                   <Package className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                  No shipments yet.
+                  {shipments.length === 0 ? 'No shipments yet.' : 'No shipments match your search.'}
                 </td>
               </tr>
             ) : (
-              shipments.map((s) => {
+              filteredShipments.map((s) => {
                 const meta = STATUS_META[s.status] || {};
                 return (
                   <tr key={s.id} className="hover:bg-muted/20">

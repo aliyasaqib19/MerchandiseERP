@@ -69,6 +69,7 @@ const NAV_SECTIONS = [
           { label: 'Products',        icon: Box,             to: '/inventory/products' },
           { label: 'Stock Movements', icon: ArrowLeftRight,  to: '/inventory/movements' },
           { label: 'Shipments',       icon: Truck,           to: '/inventory/shipments' },
+          { label: 'Receive Shipment', icon: PackageCheck,   to: '/inventory/receive-shipment' },
           { label: 'Brands',          icon: Tag,             to: '/inventory/brands' },
         ],
       },

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import {
-  Users, Package, DollarSign, ClipboardCheck,
+  Users, Package, DollarSign, AlertTriangle,
   UserPlus, ShieldPlus,
 } from 'lucide-react';
 import { StatsCard } from './StatsCard';
@@ -48,10 +48,6 @@ export function AdminDashboard() {
     queryKey: ['dash-sales', whId],
     queryFn: () => api.get('/sales/stats').then((r) => r.data),
   });
-  const { data: approvals } = useQuery({
-    queryKey: ['dash-approvals', whId],
-    queryFn: () => api.get('/approvals/stats').then((r) => r.data),
-  });
 
   const stats = [
     {
@@ -72,11 +68,12 @@ export function AdminDashboard() {
       icon: DollarSign, color: 'green',
     },
     {
-      label: 'Pending Approvals', value: String(approvals?.pending ?? '—'),
-      sub: approvals ? `${approvals.approved || 0} approved` : 'Loading…',
-      icon: ClipboardCheck, color: 'orange',
-      trend: approvals?.pending > 0 ? 'up' : null,
-      trendValue: approvals?.pending > 0 ? `${approvals.pending}` : undefined,
+      label: 'Low Stock Items', value: String(inventory?.lowStockCount ?? '—'),
+      sub: inventory ? 'Below the item\'s min. threshold' : 'Loading…',
+      icon: AlertTriangle, color: 'orange',
+      trend: inventory?.lowStockCount > 0 ? 'up' : null,
+      trendValue: inventory?.lowStockCount > 0 ? `${inventory.lowStockCount}` : undefined,
+      to: '/inventory/products?lowStock=true',
     },
   ];
 

@@ -1,7 +1,8 @@
+import { Link } from 'react-router-dom';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-export function StatsCard({ label, value, sub, icon: Icon, trend, trendValue, color = 'blue', loading }) {
+export function StatsCard({ label, value, sub, icon: Icon, trend, trendValue, color = 'blue', loading, to }) {
   const colorMap = {
     blue:   { bg: 'bg-blue-50',   icon: 'bg-blue-500',   text: 'text-blue-600' },
     green:  { bg: 'bg-green-50',  icon: 'bg-green-500',  text: 'text-green-600' },
@@ -17,8 +18,8 @@ export function StatsCard({ label, value, sub, icon: Icon, trend, trendValue, co
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
   const trendColor = trend === 'up' ? 'text-green-600' : trend === 'down' ? 'text-red-500' : 'text-muted-foreground';
 
-  return (
-    <div className="bg-card border rounded-xl p-5 flex flex-col gap-3 hover:shadow-md transition-shadow">
+  const content = (
+    <>
       <div className="flex items-start justify-between">
         <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', c.icon)}>
           {Icon && <Icon className="w-5 h-5 text-white" />}
@@ -43,6 +44,13 @@ export function StatsCard({ label, value, sub, icon: Icon, trend, trendValue, co
           {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
         </div>
       )}
-    </div>
+    </>
   );
+
+  const className = 'bg-card border rounded-xl p-5 flex flex-col gap-3 hover:shadow-md transition-shadow';
+
+  if (to) {
+    return <Link to={to} className={className}>{content}</Link>;
+  }
+  return <div className={className}>{content}</div>;
 }

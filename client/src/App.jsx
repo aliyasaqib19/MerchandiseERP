@@ -22,6 +22,7 @@ import ProductDetailPage from './pages/inventory/ProductDetailPage';
 import InventoryHistoryPage from './pages/inventory/InventoryHistoryPage';
 import ShipmentsPage from './pages/inventory/ShipmentsPage';
 import ShipmentDetailPage from './pages/inventory/ShipmentDetailPage';
+import ReceiveShipmentPage from './pages/inventory/ReceiveShipmentPage';
 import BrandsPage from './pages/inventory/BrandsPage';
 import BrandDetailPage from './pages/inventory/BrandDetailPage';
 import BrandProductPage from './pages/inventory/BrandProductPage';
@@ -110,6 +111,7 @@ export default function App() {
             <Route path="/inventory/movements" element={<Guarded permission="INVENTORY_VIEW"><InventoryHistoryPage /></Guarded>} />
             <Route path="/inventory/shipments" element={<Guarded permission="INVENTORY_VIEW"><ShipmentsPage /></Guarded>} />
             <Route path="/inventory/shipments/:id" element={<Guarded permission="INVENTORY_VIEW"><ShipmentDetailPage /></Guarded>} />
+            <Route path="/inventory/receive-shipment" element={<Guarded permission="INVENTORY_VIEW"><ReceiveShipmentPage /></Guarded>} />
             <Route path="/inventory/brands" element={<Guarded permission="INVENTORY_VIEW"><BrandsPage /></Guarded>} />
             <Route path="/inventory/brands/:id" element={<Guarded permission="INVENTORY_VIEW"><BrandDetailPage /></Guarded>} />
             <Route path="/inventory/brands/:id/products/:productId" element={<Guarded permission="INVENTORY_VIEW"><BrandProductPage /></Guarded>} />
