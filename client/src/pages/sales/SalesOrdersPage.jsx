@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus, Search, Package, ChevronRight, CheckCircle2,
   Truck, XCircle, Loader2, Edit2, AlertTriangle, Upload, FileText,
+  Download, ChevronLeft,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -376,10 +377,16 @@ function SaleDetail({ sale, onClose, onRefresh, onReopened, onRemoved }) {
   );
 }
 
+const PAGE_SIZE = 50;
+
 export default function SalesOrdersPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [page, setPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [detailId, setDetailId]     = useState(() => searchParams.get('id') ? Number(searchParams.get('id')) : null);
@@ -389,15 +396,46 @@ export default function SalesOrdersPage() {
     if (searchParams.get('id')) setSearchParams({}, { replace: true });
   }, []);
 
+  // Any filter change should jump back to page 1 — otherwise you can land on
+  // a page number that no longer exists for the new filter set.
+  useEffect(() => { setPage(1); }, [search, status, fromDate, toDate]);
+
+  function buildFilterParams() {
+    const p = new URLSearchParams();
+    if (search) p.set('search', search);
+    if (status) p.set('status', status);
+    if (fromDate) p.set('fromDate', fromDate);
+    if (toDate) p.set('toDate', toDate);
+    return p;
+  }
+
   const { data, isLoading } = useQuery({
-    queryKey: ['sales', { search, status }],
+    queryKey: ['sales', { search, status, fromDate, toDate, page }],
     queryFn: () => {
-      const p = new URLSearchParams();
-      if (search) p.set('search', search);
-      if (status) p.set('status', status);
+      const p = buildFilterParams();
+      p.set('page', page);
+      p.set('limit', PAGE_SIZE);
       return api.get(`/sales?${p}`).then((r) => r.data);
     },
   });
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const p = buildFilterParams();
+      const res = await api.get(`/sales/export?${p}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sales-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const { data: detail, refetch: refetchDetail } = useQuery({
     queryKey: ['sale-detail', detailId],
@@ -413,6 +451,7 @@ export default function SalesOrdersPage() {
 
   const sales = data?.sales || [];
   const total = data?.total || 0;
+  const pages = data?.pages || 1;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -421,12 +460,18 @@ export default function SalesOrdersPage() {
           <h1 className="text-2xl font-bold">Sales Orders</h1>
           <p className="text-muted-foreground text-sm mt-0.5">{total} total</p>
         </div>
-        <Button onClick={() => setShowCreate(true)}>
-          <Plus className="w-4 h-4" /> New Sale
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExport} disabled={exporting}>
+            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            Download CSV
+          </Button>
+          <Button onClick={() => setShowCreate(true)}>
+            <Plus className="w-4 h-4" /> New Sale
+          </Button>
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 items-end">
         <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input className="pl-9" placeholder="Search by number or client..." value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -438,6 +483,23 @@ export default function SalesOrdersPage() {
           <option value="DELIVERED">Delivered</option>
           <option value="CANCELLED">Cancelled</option>
         </Select>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">From</label>
+          <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="w-36" />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">To</label>
+          <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="w-36" />
+        </div>
+        {(search || status || fromDate || toDate) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { setSearch(''); setStatus(''); setFromDate(''); setToDate(''); }}
+          >
+            Clear filters
+          </Button>
+        )}
       </div>
 
       <div className="border rounded-xl overflow-hidden">
@@ -504,6 +566,22 @@ export default function SalesOrdersPage() {
           </tbody>
         </table>
       </div>
+
+      {pages > 1 && (
+        <div className="flex items-center justify-between text-sm">
+          <p className="text-muted-foreground">
+            Page {page} of {pages} — showing {sales.length} of {total} orders
+          </p>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+              <ChevronLeft className="w-4 h-4" /> Previous
+            </Button>
+            <Button variant="outline" size="sm" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>
+              Next <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Create */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>

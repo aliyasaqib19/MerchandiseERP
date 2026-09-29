@@ -8,9 +8,10 @@ const ctrl         = require('../controllers/sale.controller');
 const router = Router();
 router.use(authenticate);
 
-router.get('/stats', authorize('SALES_VIEW'), ctrl.getDashboardStats);
-router.get('/',      authorize('SALES_VIEW'), ctrl.getSales);
-router.get('/:id',   authorize('SALES_VIEW'), ctrl.getSale);
+router.get('/stats',  authorize('SALES_VIEW'), ctrl.getDashboardStats);
+router.get('/export', authorize('SALES_VIEW'), ctrl.exportSales);
+router.get('/',       authorize('SALES_VIEW'), ctrl.getSales);
+router.get('/:id',    authorize('SALES_VIEW'), ctrl.getSale);
 
 router.post('/',
   authorize('SALES_CREATE'),

@@ -88,9 +88,8 @@ async function getDashboardStats(req, res) {
 
 // ─── Sales CRUD ───────────────────────────────────────────────────────────────
 
-async function getSales(req, res) {
-  const { search, status, clientId, page = 1, limit = 50 } = req.query;
-  const skip = (Number(page) - 1) * Number(limit);
+function buildSalesWhere(req) {
+  const { search, status, clientId, fromDate, toDate } = req.query;
   const where = {};
 
   if (status) where.status = status;
@@ -102,6 +101,22 @@ async function getSales(req, res) {
       { client: { companyName: { contains: search, mode: 'insensitive' } } },
     ];
   }
+  if (fromDate || toDate) {
+    where.saleDate = {};
+    if (fromDate) where.saleDate.gte = new Date(fromDate);
+    if (toDate) {
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      where.saleDate.lte = end;
+    }
+  }
+  return where;
+}
+
+async function getSales(req, res) {
+  const { page = 1, limit = 50 } = req.query;
+  const skip = (Number(page) - 1) * Number(limit);
+  const where = buildSalesWhere(req);
 
   const [sales, total] = await Promise.all([
     prisma.base.sale.findMany({
@@ -113,7 +128,7 @@ async function getSales(req, res) {
         createdByUser: { select: { fullName: true } },
         _count:        { select: { items: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { saleDate: 'desc' },
       skip,
       take: Number(limit),
     }),
@@ -121,6 +136,49 @@ async function getSales(req, res) {
   ]);
 
   res.json({ sales, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
+}
+
+function csvEscape(val) {
+  if (val === null || val === undefined) return '';
+  const s = String(val);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+async function exportSales(req, res) {
+  const where = buildSalesWhere(req);
+
+  const sales = await prisma.base.sale.findMany({
+    where,
+    include: {
+      client:        { select: { companyName: true } },
+      createdByUser: { select: { fullName: true } },
+      _count:        { select: { items: true } },
+    },
+    orderBy: { saleDate: 'desc' },
+  });
+
+  const headers = [
+    'Sale #', 'Client', 'Delivery Challan #', 'Invoice Uploaded', 'Challan Uploaded',
+    'Items', 'Total', 'Sale Date', 'Status', 'Created By',
+  ];
+  const rows = sales.map((s) => [
+    s.saleNumber,
+    s.client?.companyName,
+    s.deliveryChallanNumber,
+    s.invoiceUploaded ? 'Yes' : 'No',
+    s.challanUploaded ? 'Yes' : 'No',
+    s._count.items,
+    s.totalAmount,
+    s.saleDate.toISOString().slice(0, 10),
+    s.status,
+    s.createdByUser?.fullName,
+  ]);
+
+  const csv = [headers, ...rows].map((row) => row.map(csvEscape).join(',')).join('\n');
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="sales-orders-${new Date().toISOString().slice(0, 10)}.csv"`);
+  res.send(csv);
 }
 
 async function getSale(req, res) {
@@ -553,5 +611,5 @@ module.exports = {
   getDashboardStats,
   getSales, getSale, createSale, updateSale, deleteSale,
   confirmSale, deliverSale, cancelSale, reopenSale, uploadChallanFile,
-  uploadInvoiceFile, setInvoiceStatus, setChallanStatus,
+  uploadInvoiceFile, setInvoiceStatus, setChallanStatus, exportSales,
 };
