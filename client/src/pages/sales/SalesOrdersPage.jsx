@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import * as XLSX from 'xlsx';
 import {
   Plus, Search, Package, ChevronRight, CheckCircle2,
   Truck, XCircle, Loader2, Edit2, AlertTriangle, Upload, FileText,
-  Download, ChevronLeft,
+  Download, ChevronLeft, FileSpreadsheet,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -387,6 +388,7 @@ export default function SalesOrdersPage() {
   const [toDate, setToDate] = useState('');
   const [page, setPage] = useState(1);
   const [exporting, setExporting] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [detailId, setDetailId]     = useState(() => searchParams.get('id') ? Number(searchParams.get('id')) : null);
@@ -419,7 +421,7 @@ export default function SalesOrdersPage() {
     },
   });
 
-  async function handleExport() {
+  async function handleExportCsv() {
     setExporting(true);
     try {
       const p = buildFilterParams();
@@ -434,6 +436,21 @@ export default function SalesOrdersPage() {
       window.URL.revokeObjectURL(url);
     } finally {
       setExporting(false);
+    }
+  }
+
+  async function handleExportExcel() {
+    setExportingExcel(true);
+    try {
+      const p = buildFilterParams();
+      p.set('format', 'json');
+      const { headers, rows } = await api.get(`/sales/export?${p}`).then((r) => r.data);
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Sales Orders');
+      XLSX.writeFile(wb, `sales-orders-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } finally {
+      setExportingExcel(false);
     }
   }
 
@@ -461,9 +478,13 @@ export default function SalesOrdersPage() {
           <p className="text-muted-foreground text-sm mt-0.5">{total} total</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExport} disabled={exporting}>
+          <Button variant="outline" onClick={handleExportCsv} disabled={exporting}>
             {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
             Download CSV
+          </Button>
+          <Button variant="outline" onClick={handleExportExcel} disabled={exportingExcel}>
+            {exportingExcel ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
+            Download Excel
           </Button>
           <Button onClick={() => setShowCreate(true)}>
             <Plus className="w-4 h-4" /> New Sale

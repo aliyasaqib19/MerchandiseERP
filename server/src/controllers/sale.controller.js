@@ -174,6 +174,12 @@ async function exportSales(req, res) {
     s.createdByUser?.fullName,
   ]);
 
+  // format=json feeds the client's Excel export (built client-side with the
+  // xlsx library already used for product import); default stays CSV.
+  if (req.query.format === 'json') {
+    return res.json({ headers, rows });
+  }
+
   const csv = [headers, ...rows].map((row) => row.map(csvEscape).join(',')).join('\n');
 
   res.setHeader('Content-Type', 'text/csv');
